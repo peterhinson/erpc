@@ -183,7 +183,7 @@ erpc_status_t TCPTransport::connectClient(void)
 
             // Disable SIGPIPE for this socket. This will cause write() to return an EPIPE statusor if the
             // other side has disappeared instead of our process receiving a SIGPIPE.
-            set = 1;
+            int set = 1;
             if (setsockopt(sock, SOL_SOCKET, SO_NOSIGPIPE, (void *)&set, sizeof(int)) < 0)
             {
                 ::close(sock);
