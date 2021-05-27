@@ -385,7 +385,7 @@ public:
      *
      * @return Pointer to created codec.
      */
-    virtual Codec *create(void) override { return new (std::nothrow) BasicCodec; }
+    virtual Codec *create(void) override { return new BasicCodec; }
 
     /*!
      * @brief Dispose codec.
