@@ -43,8 +43,8 @@ public:
     : m_semaphore(1)
 #endif
     {
-        (void)memset(m_freeBufferBitmap, 0xff, ERPC_DEFAULT_BUFFERS_COUNT >> 3);
-        (void)memset(m_buffers, 0, ERPC_DEFAULT_BUFFERS_COUNT * ERPC_BUFFER_SIZE_UINT8);
+        (void)memset(m_freeBufferBitmap, 0xff, (ERPC_DEFAULT_BUFFERS_COUNT >> 3)+1U);
+        (void)memset(m_buffers, 0, sizeof(m_buffers));
     }
 
     /*!
@@ -63,7 +63,7 @@ public:
 #if !ERPC_THREADS_IS(NONE)
         m_semaphore.get();
 #endif
-        while (((m_freeBufferBitmap[idx >> 3U] & (1U << (idx & 0x7U))) == 0U) && (idx < ERPC_DEFAULT_BUFFERS_COUNT))
+        while ((idx < ERPC_DEFAULT_BUFFERS_COUNT) && ((m_freeBufferBitmap[idx >> 3U] & (1U << (idx & 0x7U))) == 0U))
         {
             idx++;
         }
