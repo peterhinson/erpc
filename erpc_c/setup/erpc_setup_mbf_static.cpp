@@ -22,8 +22,8 @@
 
 using namespace erpc;
 
-#define ERPC_BUFFER_SIZE_UINT8 ((ERPC_DEFAULT_BUFFER_SIZE + sizeof(uint64_t) - 1))
-#define ERPC_BUFFER_SIZE_UINT64 (ERPC_BUFFER_SIZE_UINT8 / sizeof(uint64_t))
+#define ERPC_BUFFER_SIZE_UINT64 \
+    ((ERPC_DEFAULT_BUFFER_SIZE + sizeof(uint64_t) - 1) / sizeof(uint64_t))
 
 ////////////////////////////////////////////////////////////////////////////////
 // Classes
@@ -43,7 +43,7 @@ public:
     : m_semaphore(1)
 #endif
     {
-        (void)memset(m_freeBufferBitmap, 0xff, (ERPC_DEFAULT_BUFFERS_COUNT >> 3)+1U);
+        (void)memset(m_freeBufferBitmap, 0xff, sizeof(m_freeBufferBitmap));
         (void)memset(m_buffers, 0, sizeof(m_buffers));
     }
 
@@ -63,11 +63,10 @@ public:
 #if !ERPC_THREADS_IS(NONE)
         m_semaphore.get();
 #endif
-        while ((idx < ERPC_DEFAULT_BUFFERS_COUNT) && ((m_freeBufferBitmap[idx >> 3U] & (1U << (idx & 0x7U))) == 0U))
+        while (((m_freeBufferBitmap[idx >> 3U] & (1U << (idx & 0x7U))) == 0U) && (idx < ERPC_DEFAULT_BUFFERS_COUNT))
         {
             idx++;
         }
-
         assert(idx < ERPC_DEFAULT_BUFFERS_COUNT);
 
         m_freeBufferBitmap[idx >> 3U] &= ~(1U << (idx & 0x7U));
@@ -112,8 +111,12 @@ public:
     }
 
 protected:
-    uint8_t m_freeBufferBitmap[(ERPC_DEFAULT_BUFFERS_COUNT >> 3U) + 1U];     /*!< Bitmat of used/not used buffers. */
-    uint64_t m_buffers[ERPC_DEFAULT_BUFFERS_COUNT][ERPC_BUFFER_SIZE_UINT64]; /*!< Static buffers. */
+    //! Bitmap representing which buffers are in use. A bit value of 1 means free and 0 means in
+    //! use.
+    uint8_t m_freeBufferBitmap[(ERPC_DEFAULT_BUFFERS_COUNT >> 3U) +
+                               (ERPC_DEFAULT_BUFFERS_COUNT % 8 ? 1U : 0U)];
+    //! Static buffers
+    uint64_t m_buffers[ERPC_DEFAULT_BUFFERS_COUNT][ERPC_BUFFER_SIZE_UINT64];
 #if !ERPC_THREADS_IS(NONE)
     Semaphore m_semaphore; /*!< Semaphore.*/
 #endif
@@ -123,7 +126,7 @@ protected:
 // Variables
 ////////////////////////////////////////////////////////////////////////////////
 
-static ManuallyConstructed<StaticMessageBufferFactory> s_msgFactory;
+ERPC_MANUALLY_CONSTRUCTED(StaticMessageBufferFactory, s_msgFactory);
 
 erpc_mbf_t erpc_mbf_static_init(void)
 {
