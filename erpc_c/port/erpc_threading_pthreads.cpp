@@ -44,7 +44,8 @@ Thread::Thread(const char *name)
 {
 }
 
-Thread::Thread(thread_entry_t entry, uint32_t priority, uint32_t stackSize, const char *name)
+Thread::Thread(thread_entry_t entry, uint32_t priority, uint32_t stackSize, const char *name,
+               thread_stack_pointer stackPtr)
 : m_name(name)
 , m_entry(entry)
 , m_arg(0)
@@ -56,11 +57,12 @@ Thread::Thread(thread_entry_t entry, uint32_t priority, uint32_t stackSize, cons
 
 Thread::~Thread(void) {}
 
-void Thread::init(thread_entry_t entry, uint32_t priority, uint32_t stackSize)
+void Thread::init(thread_entry_t entry, uint32_t priority, uint32_t stackSize, thread_stack_pointer stackPtr)
 {
     m_entry = entry;
     m_stackSize = stackSize;
     m_priority = priority;
+    m_stackPtr = stackPtr;
 }
 
 void Thread::start(void *arg)
