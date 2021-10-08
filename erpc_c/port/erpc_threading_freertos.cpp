@@ -135,7 +135,17 @@ Thread *Thread::getCurrentThread(void)
 void Thread::sleep(uint32_t usecs)
 {
 #if INCLUDE_vTaskDelay
-    vTaskDelay(usecs / 1000 / portTICK_PERIOD_MS);
+    if (usecs != portMAX_DELAY)
+    {
+        usecs =  usecs / 1000 / portTICK_PERIOD_MS;
+#if configUSE_16_BIT_TICKS
+        if (usecs > (portMAX_DELAY - 1))
+        {
+            usecs = portMAX_DELAY - 1;
+        }
+#endif
+    }
+    vTaskDelay(usecs);
 #endif
 }
 
@@ -267,21 +277,21 @@ void Semaphore::putFromISR(void)
 
 bool Semaphore::get(uint32_t timeout)
 {
-#if configUSE_16_BIT_TICKS
     if (timeout == kWaitForever)
     {
         timeout = portMAX_DELAY;
     }
     else
     {
+        timeout =  timeout / 1000 / portTICK_PERIOD_MS;
+#if configUSE_16_BIT_TICKS
         if (timeout > (portMAX_DELAY - 1))
         {
             timeout = portMAX_DELAY - 1;
         }
-    }
 #endif
-
-    return (pdTRUE == xSemaphoreTake(m_sem, timeout / 1000 / portTICK_PERIOD_MS));
+    }
+    return (pdTRUE == xSemaphoreTake(m_sem, timeout));
 }
 
 int Semaphore::getCount(void) const
