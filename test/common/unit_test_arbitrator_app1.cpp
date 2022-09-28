@@ -21,12 +21,12 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-#include "app_core1.h"
-#include "board.h"
-#include "mcmgr.h"
 #if defined(RPMSG)
 #include "rpmsg_lite.h"
 #endif
+#include "app_core1.h"
+#include "board.h"
+#include "mcmgr.h"
 #if defined(__CC_ARM) || defined(__ARMCC_VERSION)
 int main(int argc, char **argv);
 #endif
@@ -231,7 +231,7 @@ void quitFirstInterfaceServer()
 {
     /* removing the service from the server */
     erpc_remove_service_from_server(service);
-    destroy_FirstInterface_service();
+    destroy_FirstInterface_service((erpc_service_t *)service);
 
     // Stop server part
     erpc_server_stop();

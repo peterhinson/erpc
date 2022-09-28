@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2014-2016, Freescale Semiconductor, Inc.
- * Copyright 2016 NXP
+ * Copyright 2016 - 2022 NXP
  * All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
@@ -40,6 +40,20 @@ TEST(test_list, SendReceivedInt32)
         ++list_r;
     }
     erpc_free(send_list.elements);
+    erpc_free(received_list->elements);
+    erpc_free(received_list);
+}
+
+TEST(test_list, sendReceiveZeroSize)
+{
+    list_int32_1_t *received_list, send_list;
+    send_list.elementsCount = 0;
+    send_list.elements = NULL;
+
+    received_list = sendReceivedInt32(&send_list);
+
+    EXPECT_TRUE(received_list->elementsCount == 0);
+
     erpc_free(received_list->elements);
     erpc_free(received_list);
 }
@@ -446,7 +460,7 @@ TEST(test_list, testLengthAnnotation)
     uint32_t length = 5;
     int32_t *list = (int32_t *)erpc_malloc(length * sizeof(int32_t));
     int32_t *list_ptr = list;
-    for (int i = 0; i < length; ++i)
+    for (unsigned int i = 0; i < length; ++i)
     {
         *list_ptr = i + 1;
         ++list_ptr;

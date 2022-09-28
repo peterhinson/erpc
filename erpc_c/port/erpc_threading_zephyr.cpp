@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 NXP
+ * Copyright 2017-2021 NXP
  * Copyright 2021 ACRIOS Systems s.r.o.
  * All rights reserved.
  *
@@ -8,8 +8,6 @@
  */
 
 #include "erpc_threading.h"
-
-#include <cassert>
 
 #if ERPC_THREADS_IS(ZEPHYR)
 
@@ -56,7 +54,7 @@ void Thread::start(void *arg)
 {
     m_arg = arg;
 
-    assert(m_stack && "Set stack address");
+    erpc_assert((m_stack != NULL) && ("Set stack address" != NULL));
     m_task = k_thread_create(&m_thread, m_stack, m_stackSize, threadEntryPointStub, this, NULL, NULL, m_priority, 0, K_NO_WAIT);
 }
 
@@ -86,7 +84,7 @@ void Thread::threadEntryPoint(void)
 void Thread::threadEntryPointStub(void *arg1, void *arg2, void *arg3)
 {
     Thread *_this = reinterpret_cast<Thread *>(arg1);
-    assert(_this && "Reinterpreting 'void *arg1' to 'Thread *' failed.");
+    erpc_assert((_this != NULL) && ("Reinterpreting 'void *arg1' to 'Thread *' failed." != NULL));
     k_thread_custom_data_set(arg1);
     _this->threadEntryPoint();
 
@@ -130,9 +128,21 @@ void Semaphore::put(void)
     k_sem_give(&m_sem);
 }
 
-bool Semaphore::get(uint32_t timeout)
+bool Semaphore::get(uint32_t timeoutUsecs)
 {
-    return (k_sem_take(&m_sem, K_MSEC(timeout / 1000)) == 0);
+    if (timeoutUsecs != kWaitForever)
+    {
+        if (timeoutUsecs > 0U)
+        {
+            timeoutUsecs /= 1000U;
+            if (timeoutUsecs == 0U)
+            {
+                timeoutUsecs = 1U;
+            }
+        }
+    }
+
+    return (k_sem_take(&m_sem, K_MSEC(timeoutUsecs)) == 0);
 }
 
 int Semaphore::getCount(void) const
