@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016, Freescale Semiconductor, Inc.
- * Copyright 2016 - 2022 NXP
+ * Copyright 2016 - 2023 NXP
  * All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
@@ -12,12 +12,14 @@
 #include "erpc_transport_setup.h"
 
 #include "FreeRTOS.h"
-#include "gtest.h"
 #include "semphr.h"
 #include "task.h"
-#include "test_firstInterface.h"
-#include "test_secondInterface_server.h"
+
+#include "c_test_firstInterface_client.h"
+#include "c_test_secondInterface_server.h"
+#include "gtest.h"
 #include "unit_test.h"
+#include "unit_test_wrapped.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -30,7 +32,7 @@ extern "C" {
 #include "fsl_debug_console.h"
 #include "mcmgr.h"
 #if defined(__CC_ARM) || defined(__ARMCC_VERSION)
-int main(int argc, char **argv);
+int main(void);
 #endif
 #ifdef __cplusplus
 }
@@ -45,13 +47,16 @@ using namespace std;
 
 #define APP_ERPC_READY_EVENT_DATA (1)
 
-SemaphoreHandle_t g_waitQuitMutex;
-TaskHandle_t g_serverTask;
-TaskHandle_t g_clientTask;
+Mutex waitQuitMutex;
+Thread g_initThread("runInit");
+Thread g_serverThread("runServer");
+Thread g_clientThread("runClient");
+
 volatile int waitQuit = 0;
 volatile uint16_t eRPCReadyEventData = 0;
 extern const uint32_t erpc_generated_crc;
 erpc_service_t service = NULL;
+erpc_server_t server;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Code
@@ -66,9 +71,8 @@ static void eRPCReadyEventHandler(uint16_t eventData, void *context)
 
 void increaseWaitQuit()
 {
-    xSemaphoreTake(g_waitQuitMutex, portMAX_DELAY);
+    Mutex::Guard lock(waitQuitMutex);
     waitQuit++;
-    xSemaphoreGive(g_waitQuitMutex);
 }
 
 void runServer(void *arg)
@@ -76,7 +80,7 @@ void runServer(void *arg)
     ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
 
     erpc_status_t err;
-    err = erpc_server_run();
+    err = erpc_server_run(server);
     increaseWaitQuit();
 
     if (err != kErpcStatus_Success)
@@ -93,18 +97,17 @@ void runClient(void *arg)
     // send to ERPC second (server) app message that this app is ready.
     whenReady();
 
-    __attribute__((unused))
-    int i;
+    __attribute__((unused)) int i;
     i = RUN_ALL_TESTS();
 
     // wait until ERPC second (server) app will announce ready to quit state.
     while (true)
     {
+        Mutex::Guard lock(waitQuitMutex);
         if (waitQuit != 0)
         {
             break;
         }
-        vTaskDelay(10);
     }
 
     // send to ERPC second (server) app ready to quit state
@@ -113,18 +116,6 @@ void runClient(void *arg)
     increaseWaitQuit();
 
     vTaskSuspend(NULL);
-}
-
-/*!
- * @brief Application-specific implementation of the SystemInitHook() weak function.
- */
-void SystemInitHook(void)
-{
-    /* Initialize MCMGR - low level multicore management library. Call this
-       function as close to the reset entry as possible to allow CoreUp event
-       triggering. The SystemInitHook() weak function overloading is used in this
-       application. */
-    MCMGR_EarlyInit();
 }
 
 void runInit(void *arg)
@@ -168,6 +159,7 @@ void runInit(void *arg)
 
     // MessageBufferFactory initialization
     erpc_mbf_t message_buffer_factory;
+    erpc_client_t client;
 #if defined(RPMSG)
     message_buffer_factory = erpc_mbf_rpmsg_init(transportClient);
 #elif defined(MU)
@@ -175,34 +167,25 @@ void runInit(void *arg)
 #endif
 
     // eRPC client side initialization
-    transportServer = erpc_arbitrated_client_init(transportClient, message_buffer_factory);
+    client = erpc_arbitrated_client_init(transportClient, message_buffer_factory, &transportServer);
+    initInterfaces(client);
 
     // eRPC server side initialization
-    erpc_server_t server = erpc_server_init(transportServer, message_buffer_factory);
+    server = erpc_server_init(transportServer, message_buffer_factory);
 
-    erpc_arbitrated_client_set_crc(erpc_generated_crc);
+    erpc_arbitrated_client_set_crc(client, erpc_generated_crc);
 
     // adding server to client for nested calls.
-    erpc_arbitrated_client_set_server(server);
-    erpc_arbitrated_client_set_server_thread_id((void *)g_serverTask);
+    erpc_arbitrated_client_set_server(client, server);
+    erpc_arbitrated_client_set_server_thread_id(client, (void *)g_serverThread.getThreadId());
 
     // adding the service to the server
     service = create_SecondInterface_service();
-    erpc_add_service_to_server(service);
+    erpc_add_service_to_server(server, service);
 
     // unblock server and client task
-    xTaskNotifyGive(g_serverTask);
-    xTaskNotifyGive(g_clientTask);
-
-    // Wait until server and client will stop.
-    while (true)
-    {
-        if (waitQuit >= 3)
-        {
-            break;
-        }
-        vTaskDelay(500);
-    }
+    xTaskNotifyGive((TaskHandle_t)g_serverThread.getThreadId());
+    xTaskNotifyGive((TaskHandle_t)g_clientThread.getThreadId());
 
     vTaskSuspend(NULL);
 }
@@ -244,9 +227,13 @@ class MinimalistPrinter : public ::testing::EmptyTestEventListener
  * end of reused snippet
  ***********************************************************************************/
 
-int main(int argc, char **argv)
+int main(void)
 {
-    ::testing::InitGoogleTest(&argc, argv);
+    int fake_argc = 1;
+    const auto fake_arg0 = "dummy";
+    char *fake_argv0 = const_cast<char *>(fake_arg0);
+    char **fake_argv = &fake_argv0;
+    ::testing::InitGoogleTest(&fake_argc, fake_argv);
     BOARD_InitHardware();
 
     ::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();
@@ -266,10 +253,13 @@ int main(int argc, char **argv)
     memcpy((void *)(char *)CORE1_BOOT_ADDRESS, (void *)CORE1_IMAGE_START, core1_image_size);
 #endif
 
-    g_waitQuitMutex = xSemaphoreCreateMutex();
-    xTaskCreate(runInit, "runInit", 256, NULL, 1, NULL);
-    xTaskCreate(runServer, "runServer", 1536, NULL, 2, &g_serverTask);
-    xTaskCreate(runClient, "runClient", 1536, NULL, 1, &g_clientTask);
+    g_initThread.init(&runInit, 1, 256 * 4);
+    g_serverThread.init(&runServer, 2, 1536 * 4);
+    g_clientThread.init(&runClient, 1, 1536 * 4);
+
+    g_initThread.start();
+    g_serverThread.start();
+    g_clientThread.start();
 
     vTaskStartScheduler();
 
@@ -278,13 +268,15 @@ int main(int argc, char **argv)
     }
 }
 
+extern "C" {
 void quitSecondInterfaceServer()
 {
     /* removing the service from the server */
-    erpc_remove_service_from_server(service);
-    destroy_SecondInterface_service((erpc_service_t *)service);
+    erpc_remove_service_from_server(server, service);
+    destroy_SecondInterface_service(service);
 
     // Stop server part
-    erpc_server_stop();
+    erpc_server_stop(server);
     increaseWaitQuit();
+}
 }

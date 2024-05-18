@@ -6,15 +6,16 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#include "erpc_basic_codec.h"
+#include "erpc_basic_codec.hpp"
 #include "erpc_client_manager.h"
-#include "erpc_serial_transport.h"
+#include "erpc_serial_transport.hpp"
 
-#include "Logging.h"
+#include "Logging.hpp"
+#include "c_test_unit_test_common_client.h"
 #include "gtest.h"
-#include "gtestListener.h"
-#include "myAlloc.h"
-#include "test_unit_test_common.h"
+#include "gtestListener.hpp"
+#include "myAlloc.hpp"
+#include "unit_test_wrapped.h"
 
 using namespace erpc;
 
@@ -42,10 +43,10 @@ MyMessageBufferFactory g_msgFactory;
 BasicCodecFactory g_basicCodecFactory;
 ClientManager *g_client;
 
-int MyAlloc::allocated_ = 0;
+int ::MyAlloc::allocated_ = 0;
 
 ////////////////////////////////////////////////////////////////////////////////
-// Set up global fixture - required by BOOST Unit Test Framework
+// Set up global fixture
 ////////////////////////////////////////////////////////////////////////////////
 int main(int argc, char **argv)
 {
@@ -56,7 +57,7 @@ int main(int argc, char **argv)
 
     // create logger instance
     StdoutLogger *m_logger = new StdoutLogger();
-    m_logger->setFilterLevel(Logger::kInfo);
+    m_logger->setFilterLevel(Logger::log_level_t::kInfo);
     Log::setLogger(m_logger);
     Log::info("Starting ERPC client...\n");
 
@@ -69,6 +70,9 @@ int main(int argc, char **argv)
     g_client->setMessageBufferFactory(&g_msgFactory);
     g_client->setTransport(&g_transport);
     g_client->setCodecFactory(&g_basicCodecFactory);
+    erpc_client_t client = reinterpret_cast<erpc_client_t>(g_client);
+    initInterfaces_common(client);
+    initInterfaces(client);
 
     int ret = RUN_ALL_TESTS();
     quit();
@@ -76,6 +80,11 @@ int main(int argc, char **argv)
     free(g_client);
 
     return ret;
+}
+
+void initInterfaces_common(erpc_client_t client)
+{
+    initCommon_client(client);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

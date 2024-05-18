@@ -11,37 +11,40 @@ idl: |
     bar({dir} string a @nullable @max_length(8)) -> void
   }
 test_client.cpp:
-  - re: void bar\(\w*\s*char \* a\)
+  - re: void foo_client::bar\(\w*\s*char \* a\)
   - if (a == NULL)
   - codec->writeNullFlag(true)
   - if: dir in ('in', 'inout')
     then:
-      - codec->writeString(strlen((const char*)a), (const char*)a);
+      - uint32_t a_len = strlen((const char*)a);
+      - codec->writeString(a_len, (const char*)a);
   - if: dir == 'out'
     then:
+      - not: codec->writeString(a_len, (const char*)a);
       - not: codec->writeString(strlen((const char*)a), (const char*)a);
   - if: dir in ('out', 'inout')
     then:
       - if (a != NULL)
-      - codec->readString(&a_len, &a_local);
+      - codec->readString(a_len, &a_local);
 test_server.cpp:
   - ::bar_shim
   - char * a = NULL;
   - bool isNull;
-  - codec->readNullFlag(&isNull)
+  - codec->readNullFlag(isNull)
   - if (!isNull)
   - if: dir in ('in', 'inout')
     then:
-      - codec->readString(&a_len, &a_local)
+      - codec->readString(a_len, &a_local)
   - if: dir == 'out'
     then:
-      - not: codec->readString(&a_len, &a_local)
+      - not: codec->readString(a_len, &a_local)
   - else
   - a = NULL;
   - if: dir in ('out', 'inout')
     then:
       - if (a != NULL)
-      - codec->writeString(strlen((const char*)a), (const char*)a);
+      - uint32_t a_len = strlen((const char*)a);
+      - codec->writeString(a_len, (const char*)a);
 ---
 name: param ustring
 desc:
@@ -55,37 +58,40 @@ idl: |
     bar({dir} ustring a @nullable @max_length(8)) -> void
   }
 test_client.cpp:
-  - re: void bar\(\w*\s*unsigned\s*char\s*\* a\)
+  - re: void foo_client::bar\(\w*\s*unsigned\s*char\s*\* a\)
   - if (a == NULL)
   - codec->writeNullFlag(true)
   - if: dir in ('in', 'inout')
     then:
-      - codec->writeString(strlen((const char*)a), (const char*)a);
+      - uint32_t a_len = strlen((const char*)a);
+      - codec->writeString(a_len, (const char*)a);
   - if: dir == 'out'
     then:
+      - not: codec->writeString(a_len, (const char*)a);
       - not: codec->writeString(strlen((const char*)a), (const char*)a);
   - if: dir in ('out', 'inout')
     then:
       - if (a != NULL)
-      - codec->readString(&a_len, &a_local);
+      - codec->readString(a_len, &a_local);
 test_server.cpp:
   - ::bar_shim
   - unsigned char* a = NULL;
   - bool isNull;
-  - codec->readNullFlag(&isNull)
+  - codec->readNullFlag(isNull)
   - if (!isNull)
   - if: dir in ('in', 'inout')
     then:
-      - codec->readString(&a_len, &a_local)
+      - codec->readString(a_len, &a_local)
   - if: dir == 'out'
     then:
-      - not: codec->readString(&a_len, &a_local)
+      - not: codec->readString(a_len, &a_local)
   - else
   - a = NULL;
   - if: dir in ('out', 'inout')
     then:
       - if (a != NULL)
-      - codec->writeString(strlen((const char*)a), (const char*)a);
+      - uint32_t a_len = strlen((const char*)a);
+      - codec->writeString(a_len, (const char*)a);
 ---
 name: in param struct
 desc:
@@ -107,11 +113,12 @@ idl: |
   interface foo {
     bar(Vector v @nullable) -> void
   }
-test.h:
+test_common.h:
   - '{type[1]} v[3]'
+c_test_client.h:
   - void bar(const Vector * v);
 test_client.cpp:
-  - re: void bar\(const Vector \* v\)
+  - re: void foo_client::bar\(const Vector \* v\)
   - if (v == NULL)
   - writeNullFlag(true)
   - "{"
@@ -146,7 +153,7 @@ test_client.cpp:
   - writeNullFlag(false)
   - write_list_bool_1_t_struct
   - '}'
-  - void bar(const erpc_pair * s)
+  - void foo_client::bar(const erpc_pair * s)
   - write_erpc_pair_struct
 test_server.cpp:
   - void read_erpc_pair_struct
@@ -176,7 +183,7 @@ test_client.cpp:
   - writeNullFlag(false)
   - write_binary_t_struct
   - '}'
-  - void bar(const erpc_pair * s)
+  - void foo_client::bar(const erpc_pair * s)
   - write_erpc_pair_struct
 test_server.cpp:
   - void read_erpc_pair_struct
@@ -212,14 +219,15 @@ test_client.cpp:
       - codec->writeNullFlag(true);
       - else
       - codec->writeNullFlag(false);
-      - codec->writeString(strlen((const char*)data->a), (const char*)data->a);
+      - uint32_t a_len = strlen((const char*)data->a);
+      - codec->writeString(a_len, (const char*)data->a);
   - if: dir in ('out', 'inout')
     then:
       - void read_erpc_pair_struct
       - bool isNull;
-      - codec->readNullFlag(&isNull);
+      - codec->readNullFlag(isNull);
       - if (!isNull)
-      - codec->readString(&a_len, &a_local);
+      - codec->readString(a_len, &a_local);
       - else
       - data->a = NULL;
       - data->a = 0;
@@ -228,9 +236,9 @@ test_server.cpp:
     then:
       - void read_erpc_pair_struct
       - bool isNull;
-      - codec->readNullFlag(&isNull);
+      - codec->readNullFlag(isNull);
       - if (!isNull)
-      - codec->readString(&a_len, &a_local);
+      - codec->readString(a_len, &a_local);
       - else
       - data->a = NULL;
       - data->a = 0;
@@ -241,7 +249,8 @@ test_server.cpp:
       - codec->writeNullFlag(true);
       - else
       - codec->writeNullFlag(false);
-      - codec->writeString(strlen((const char*)data->a), (const char*)data->a);
+      - uint32_t a_len = strlen((const char*)data->a);
+      - codec->writeString(a_len, (const char*)data->a);
 
 ---
 name: return struct
@@ -258,7 +267,7 @@ idl: |
 test_client.cpp:
   - erpc_pair * result = NULL;
   - bool isNull;
-  - codec->readNullFlag(&isNull);
+  - codec->readNullFlag(isNull);
   - if (!isNull)
 
 test_server.cpp:
@@ -286,9 +295,9 @@ test_client.cpp:
   - codec->writeNullFlag
   - not: codec->write(*param2);
   - if (param1 != NULL)
-  - codec->read(param1);
+  - codec->read(*param1);
   - if (param2 != NULL)
-  - codec->read(param2);
+  - codec->read(*param2);
 
 test_server.cpp:
   - uint32_t param1;
@@ -297,11 +306,11 @@ test_server.cpp:
   - uint32_t *_param2 = NULL;
   - bool isNull;
 
-  - codec->readNullFlag(&isNull);
-  - codec->read(&param1);
+  - codec->readNullFlag(isNull);
+  - codec->read(param1);
   - _param1 = &param1;
   - _param1 = NULL;
-  - codec->readNullFlag(&isNull);
+  - codec->readNullFlag(isNull);
   - not: codec->read(
   - _param2 = &param2;
   - _param2 = NULL;
@@ -331,9 +340,9 @@ idl: |
 test_client.cpp:
   - if: dir == 'inout'
     then:
-      - void bar(const bool * l, uint32_t * c)
+      - void foo_client::bar(const bool * l, uint32_t * c)
     else:
-      - void bar(const bool * l, uint32_t c)
+      - void foo_client::bar(const bool * l, uint32_t c)
   - if: dir == 'inout' and ann == '@nullable'
     then:
       - if ((l == NULL) || (c == NULL))
@@ -363,9 +372,9 @@ test_client.cpp:
 test_server.cpp:
   - codec->readNullFlag
   - uint32_t lengthTemp_0;
-  - codec->startReadList(&lengthTemp_0);
+  - codec->startReadList(lengthTemp_0);
   - c = lengthTemp_0;
-  - codec->read(&l[listCount0])
+  - codec->read(l[listCount0])
   - if: ann == '@nullable' and dir == 'inout'
     then:
       - codec->readNullFlag
@@ -396,7 +405,7 @@ idl: |
   }
 
 test_client.cpp:
-  - void bar(bool * l, uint32_t * c)
+  - void foo_client::bar(bool * l, uint32_t * c)
   - if: ann == '@nullable'
     then:
       - if ((l == NULL) || (c == NULL))
@@ -417,7 +426,7 @@ test_client.cpp:
     else:
       - if (l != NULL)
   - codec->startReadList
-  - codec->read(&l[listCount0])
+  - codec->read(l[listCount0])
   - if: ann == '@nullable'
     then:
       - if (c != NULL)

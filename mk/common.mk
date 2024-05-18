@@ -54,28 +54,36 @@ space := $(empty) $(empty)
 #-------------------------------------------------------------------------------
 
 # Get the OS name. Known values are "Linux", "CYGWIN_NT-5.1", and "Darwin".
-os_name := $(shell uname -s)
+ifeq "$(and $(findstring Windows,$(OS)),1)" "1"
+    os_name := $(shell powershell [System.Environment]::OSVersion.Version)
+    ifneq "$(os_name)" ""
+        os_name := "MINGW"
+    endif
+else
+    os_name := $(shell uname -s)
 
-# Set to 1 if running on Darwin.
-is_darwin := $(and $(findstring Darwin,$(os_name)),1)
+    # Set to 1 if running on redhat.
+    is_redhat := $(shell if [ -f /etc/redhat-release ]; then echo 1 ; fi)
+
+    # Set to 1 if running on Linux.
+    is_linux := $(and $(findstring Linux,$(os_name)),1)
+
+    # Set to 1 if running on Darwin.
+    is_darwin := $(and $(findstring Darwin,$(os_name)),1)
+endif
 
 # Set to 1 if running on cygwin.
 is_cygwin := $(and $(findstring CYGWIN,$(os_name)),1)
 
-# Set to 1 if running on mingw.
-ifeq "$(os_name)" ""
-    is_mingw := 1
-    os_name = MINGW
-    MAKE := mingw32-make
-else
-    is_mingw := 0
+# Set to 1 if running on Windows under Mingw.
+is_mingw := $(and $(findstring MINGW,$(os_name)),1)
+ifeq "$(is_mingw)" ""
+    is_mingw := $(and $(findstring MSYS_NT,$(os_name)),1)
 endif
 
-# Set to 1 if running on redhat.
-is_redhat := $(shell if [ -f /etc/redhat-release ]; then echo 1 ; fi)
-
-# Set to 1 if running on Linux.
-is_linux := $(and $(findstring Linux,$(os_name)),1)
+ifeq "$(is_mingw)" "1"
+    os_name = MINGW64
+endif
 
 #-------------------------------------------------------------------------------
 # Logging options

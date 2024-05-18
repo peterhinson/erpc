@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2014-2016, Freescale Semiconductor, Inc.
- * Copyright 2016-2021 NXP
+ * Copyright 2016-2023 NXP
  * Copyright 2021 ACRIOS Systems s.r.o.
  * All rights reserved.
  *
@@ -8,7 +8,7 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#include "erpc_uart_cmsis_transport.h"
+#include "erpc_uart_cmsis_transport.hpp"
 
 #include <cstdio>
 
@@ -26,11 +26,11 @@ static UartTransport *s_uart_instance = NULL;
 // Code
 ////////////////////////////////////////////////////////////////////////////////
 
-UartTransport::UartTransport(ARM_DRIVER_USART *uartDrv)
-: m_uartDrv(uartDrv)
+UartTransport::UartTransport(ARM_DRIVER_USART *uartDrv) :
+m_uartDrv(uartDrv)
 #if !ERPC_THREADS_IS(NONE)
-, m_rxSemaphore()
-, m_txSemaphore()
+,
+m_rxSemaphore(), m_txSemaphore()
 #endif
 {
     s_uart_instance = this;
@@ -85,15 +85,7 @@ erpc_status_t UartTransport::init(void)
         status = (*m_uartDrv).PowerControl(ARM_POWER_FULL); /* Enable Receiver and Transmitter lines */
         if (status == ARM_DRIVER_OK)
         {
-            status = m_uartDrv->Control(ARM_USART_CONTROL_TX, 1);
-            if (status == ARM_DRIVER_OK)
-            {
-                status = m_uartDrv->Control(ARM_USART_CONTROL_RX, 1);
-                if (status == ARM_DRIVER_OK)
-                {
-                    erpcStatus = kErpcStatus_Success;
-                }
-            }
+            erpcStatus = kErpcStatus_Success;
         }
     }
 

@@ -6,14 +6,14 @@
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
-#include "ErpcLexer.h"
+#include "ErpcLexer.hpp"
 
-#include "erpc_crc16.h"
+#include "erpc_crc16.hpp"
 #include "erpc_version.h"
 
-#include "Generator.h"
-#include "HexValues.h"
-#include "SearchPath.h"
+#include "Generator.hpp"
+#include "HexValues.hpp"
+#include "SearchPath.hpp"
 
 #include <algorithm>
 #include <fstream>
@@ -33,11 +33,7 @@ using namespace std;
 // Code
 ////////////////////////////////////////////////////////////////////////////////
 
-ErpcLexer::ErpcLexer(const char *inputFile)
-: m_value(nullptr)
-, m_indents(0)
-, m_currentFileInfo(NULL)
-, m_idlCrc16(0)
+ErpcLexer::ErpcLexer(const char *inputFile) : m_value(nullptr), m_indents(0), m_currentFileInfo(NULL), m_idlCrc16(0)
 {
     m_currentFileInfo = openFile(inputFile);
     yyrestart(m_currentFileInfo->m_savedFile.get()); // instead of yyFlexLexer(idlFile);
@@ -79,14 +75,16 @@ int ErpcLexer::processStringEscapes(const char *in, char *out)
     {
         switch (*in)
         {
-            case '\\': {
+            case '\\':
+            {
                 // start of an escape sequence
                 char c = *++in;
                 switch (c)
                 {
                     case 0: // end of the string, bail
                         break;
-                    case 'x': {
+                    case 'x':
+                    {
                         // start of a hex char escape sequence
 
                         // read high and low nibbles, checking for end of string
@@ -230,7 +228,7 @@ CurrentFileInfo *ErpcLexer::openFile(const string &fileName)
     /* Counting CRC16 for Generator. */
     string str((istreambuf_iterator<char>(*inputFile)), istreambuf_iterator<char>());
     erpc::Crc16 crc16 = erpc::Crc16(ERPC_VERSION_NUMBER);
-    m_idlCrc16 += crc16.computeCRC16((const uint8_t *)str.c_str(), str.size());
+    m_idlCrc16 += crc16.computeCRC16(reinterpret_cast<const uint8_t *>(str.c_str()), str.size());
 
     /* Reset state to beginning of file. */
     inputFile->clear();

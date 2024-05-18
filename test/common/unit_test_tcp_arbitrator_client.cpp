@@ -6,18 +6,20 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#include "erpc_arbitrated_client_manager.h"
-#include "erpc_basic_codec.h"
-#include "erpc_simple_server.h"
-#include "erpc_tcp_transport.h"
-#include "erpc_transport_arbitrator.h"
+#include "erpc_arbitrated_client_manager.hpp"
+#include "erpc_basic_codec.hpp"
+#include "erpc_simple_server.hpp"
+#include "erpc_tcp_transport.hpp"
+#include "erpc_transport_arbitrator.hpp"
 
-#include "Logging.h"
+#include "Logging.hpp"
+#include "c_test_firstInterface_client.h"
 #include "gtest.h"
-#include "test_firstInterface.h"
-#include "test_secondInterface.h"
 #include "unit_test.h"
+#include "unit_test_wrapped.h"
 
+#include <chrono>
+#include <thread>
 #include <unistd.h>
 
 using namespace erpc;
@@ -61,7 +63,6 @@ void increaseWaitQuit()
 {
     Mutex::Guard lock(waitQuitMutex);
     waitQuit++;
-    Mutex::Guard unlock(waitQuitMutex);
 }
 
 void runServer(void *arg)
@@ -87,7 +88,6 @@ void runClient(void *arg)
         {
             break;
         }
-        Mutex::Guard unlock(waitQuitMutex);
     }
 
     // send to ERPC second (server) app ready to quit state
@@ -97,7 +97,7 @@ void runClient(void *arg)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// Set up global fixture - required by BOOST Unit Test Framework
+// Set up global fixture
 ////////////////////////////////////////////////////////////////////////////////
 int main(int argc, char **argv)
 {
@@ -106,11 +106,13 @@ int main(int argc, char **argv)
     // create logger instance
     StdoutLogger m_logger;
 
-    m_logger.setFilterLevel(Logger::kInfo);
+    m_logger.setFilterLevel(Logger::log_level_t::kInfo);
     Log::setLogger(&m_logger);
 
     Log::info("Intit ERPC first (client) app...\n");
 
+    std::chrono::milliseconds duration(500);
+    std::this_thread::sleep_for(duration);
     erpc_status_t err = g_transport.open();
     if (err)
     {
@@ -150,6 +152,8 @@ int main(int argc, char **argv)
 
     add_services(&g_server);
     g_client->setServer(&g_server);
+    erpc_client_t client = reinterpret_cast<erpc_client_t>(g_client);
+    initInterfaces(client);
 
     int i = -1;
     err = (erpc_status_t)-1;
@@ -169,7 +173,6 @@ int main(int argc, char **argv)
         {
             break;
         }
-        Mutex::Guard unlock(waitQuitMutex);
     }
 
     // Close transport
@@ -186,6 +189,7 @@ int main(int argc, char **argv)
     return i;
 }
 
+extern "C" {
 void quitSecondInterfaceServer()
 {
     // removing SecondInterface service from the server
@@ -193,4 +197,5 @@ void quitSecondInterfaceServer()
     // Stop server part
     g_server.stop();
     increaseWaitQuit();
+}
 }

@@ -7,19 +7,21 @@
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
-#include "erpc_rpmsg_lite_transport.h"
+#include "erpc_rpmsg_lite_transport.hpp"
 
 #include "erpc_config_internal.h"
 
+extern "C" {
 #include "rpmsg_ns.h"
+}
 
 using namespace erpc;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Variables
 ////////////////////////////////////////////////////////////////////////////////
-uint8_t RPMsgBaseTransport::s_initialized = 0U;
-struct rpmsg_lite_instance *RPMsgBaseTransport::s_rpmsg = NULL;
+uint8_t RPMsgBase::s_initialized = 0U;
+struct rpmsg_lite_instance *RPMsgBase::s_rpmsg = NULL;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Code
@@ -27,22 +29,17 @@ struct rpmsg_lite_instance *RPMsgBaseTransport::s_rpmsg = NULL;
 
 int32_t RPMsgTransport::rpmsg_read_cb(void *payload, uint32_t payload_len, uint32_t src, void *priv)
 {
-    RPMsgTransport *transport = (RPMsgTransport *)priv;
+    RPMsgTransport *transport = reinterpret_cast<RPMsgTransport *>(priv);
     if (payload_len <= ERPC_DEFAULT_BUFFER_SIZE)
     {
-        MessageBuffer message((uint8_t *)payload, payload_len);
+        MessageBuffer message(reinterpret_cast<uint8_t *>(payload), payload_len);
         message.setUsed((uint16_t)payload_len);
         (void)transport->m_messageQueue.add(message);
     }
     return RL_HOLD;
 }
 
-RPMsgTransport::RPMsgTransport(void)
-: RPMsgBaseTransport()
-, m_dst_addr(0)
-, m_rpmsg_ept(NULL)
-{
-}
+RPMsgTransport::RPMsgTransport(void) : Transport(), RPMsgBase(), m_dst_addr(0), m_rpmsg_ept(NULL), m_crcImpl(NULL) {}
 
 RPMsgTransport::~RPMsgTransport(void)
 {
@@ -144,7 +141,7 @@ erpc_status_t RPMsgTransport::init(uint32_t src_addr, uint32_t dst_addr, void *b
                 ready_cb();
             }
 
-            rpmsg_lite_wait_for_link_up(s_rpmsg);
+            (void)rpmsg_lite_wait_for_link_up(s_rpmsg, RL_BLOCK);
 
 #if RL_USE_STATIC_API
             m_rpmsg_ept = rpmsg_lite_create_ept(s_rpmsg, src_addr, rpmsg_read_cb, this, &m_ept_context);
@@ -207,9 +204,25 @@ erpc_status_t RPMsgTransport::receive(MessageBuffer *message)
 
 erpc_status_t RPMsgTransport::send(MessageBuffer *message)
 {
-    int32_t ret_val =
-        rpmsg_lite_send_nocopy(s_rpmsg, m_rpmsg_ept, m_dst_addr, (char *)message->get(), message->getUsed());
+    int32_t ret_val = rpmsg_lite_send_nocopy(s_rpmsg, m_rpmsg_ept, m_dst_addr, reinterpret_cast<char *>(message->get()),
+                                             message->getUsed());
     message->set(NULL, 0);
 
     return (ret_val != RL_SUCCESS) ? kErpcStatus_SendFailed : kErpcStatus_Success;
+}
+
+bool RPMsgTransport::hasMessage(void)
+{
+    return ((0UL < m_messageQueue.size()) ? true : false);
+}
+
+void RPMsgTransport::setCrc16(Crc16 *crcImpl)
+{
+    erpc_assert(crcImpl != NULL);
+    m_crcImpl = crcImpl;
+}
+
+Crc16 *RPMsgTransport::getCrc16(void)
+{
+    return m_crcImpl;
 }

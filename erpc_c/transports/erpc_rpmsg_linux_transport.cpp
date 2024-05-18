@@ -7,7 +7,7 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#include "erpc_rpmsg_linux_transport.h"
+#include "erpc_rpmsg_linux_transport.hpp"
 
 #include <unistd.h>
 
@@ -17,10 +17,8 @@ using namespace erpc;
 // Code
 ////////////////////////////////////////////////////////////////////////////////
 
-RPMsgLinuxTransport::RPMsgLinuxTransport(RPMsgEndpoint *endPoint, int16_t remote)
-: Transport()
-, m_endPoint(endPoint)
-, m_remote(remote)
+RPMsgLinuxTransport::RPMsgLinuxTransport(RPMsgEndpoint *endPoint, int16_t remote) :
+Transport(), m_endPoint(endPoint), m_remote(remote)
 {
 }
 

@@ -17,13 +17,15 @@ import re
 import os
 import sys
 
-#define output text colour class
+
 class bcolors:
+    # define output text colour class
     GREEN = '\033[36m'
     BLUE = '\033[38;5;097m'
-    ORANGE= '\033[38;5;172m'
+    ORANGE = '\033[38;5;172m'
     RED = '\033[31m'
     ENDC = '\033[0m'
+
 
 def isTestDir(dir):
     regex = re.compile('test_*')
@@ -32,16 +34,20 @@ def isTestDir(dir):
     else:
         return False
 
+
 testClientCommand = "run-tcp-client"
 testServerCommand = "run-tcp-server"
 transportLayer = "tcp"
-target = "debug"
+target = "release"
+compilerC = ""
+compilerCpp = ""
+make = "make"
 
 # Process command line options
 # Check for 2 or more arguments because argv[0] is the script name
 if len(sys.argv) > 2:
-    print ("Too many arguments. Please specify only the transport layer to use. Options are: tcp")
-    sys.exit()
+    print("Too many arguments. Please specify only the transport layer to use. Options are: tcp")
+    sys.exit(1)
 if len(sys.argv) >= 2:
     for arg in sys.argv[1:]:
         if arg == "tcp":
@@ -52,9 +58,18 @@ if len(sys.argv) >= 2:
             target = "debug"
         elif arg == "-r":
             target = "release"
+        elif arg == "clang":
+            compilerC = "clang"
+            compilerCpp = "clang++"
+        elif arg == "gcc":
+            compilerC = "gcc"
+            compilerCpp = "gcc++"
+        elif "-m" in arg:
+            make = arg[2:]
         else:
             print("Invalid argument/s. Options are: tcp, -r, -d\n")
-            sys.exit()
+            sys.exit(1)
+
 
 unitTestPath = "./test/"
 # enter Unit Test Directory
@@ -66,14 +81,31 @@ dirs = os.listdir(os.curdir)
 testDirs = filter(isTestDir, dirs)
 
 build = "build=" + target
+testsExitStatus = 0
+
+clientCmd = [make, build, testClientCommand]
+serverCmd = [make, build, testServerCommand]
+compilerParamC = ""
+compilerParamCpp = ""
+if compilerC != "":
+    compilerParamC = "CC="+compilerC
+    compilerParamCpp = "CXX="+compilerParamCpp
+    clientCmd.append(compilerParamC)
+    serverCmd.append(compilerParamC)
+    clientCmd.append(compilerParamCpp)
+    serverCmd.append(compilerParamCpp)
 
 for dir in testDirs:
-    print(bcolors.BLUE + "\nRunning " + bcolors.ORANGE + dir + bcolors.BLUE +" unit tests with "
-            + bcolors.ORANGE + transportLayer + bcolors.BLUE + " transport layer." + bcolors.ENDC)
+    print(bcolors.BLUE + "\nRunning " + bcolors.ORANGE + dir + bcolors.BLUE + " unit tests with "
+          + bcolors.ORANGE + transportLayer + bcolors.BLUE + " transport layer." + bcolors.ENDC)
     os.chdir(dir)
-    call(["make", build, testServerCommand])
-    call(["make", build, testClientCommand])
+    call(serverCmd)
+    testsExitStatus += call(clientCmd)
     os.chdir('..')
 
 # For completeness, change back to erpc/ directory
 os.chdir('..')
+
+if testsExitStatus != 0:
+    print("\n\nSome tests end with failures.\n\n")
+    sys.exit(testsExitStatus)

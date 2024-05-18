@@ -7,28 +7,29 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#include "AliasType.h"
-#include "Annotation.h"
-#include "ArrayType.h"
-#include "DataType.h"
-#include "EnumMember.h"
-#include "EnumType.h"
-#include "Function.h"
-#include "FunctionType.h"
-#include "Group.h"
-#include "Interface.h"
-#include "ListType.h"
-#include "Logging.h"
-#include "ParseErrors.h"
-#include "StructMember.h"
-#include "StructType.h"
-#include "Symbol.h"
-#include "SymbolScope.h"
-#include "UnionCase.h"
-#include "UnionType.h"
+#include "AliasType.hpp"
+#include "Annotation.hpp"
+#include "ArrayType.hpp"
+#include "DataType.hpp"
+#include "EnumMember.hpp"
+#include "EnumType.hpp"
+#include "Function.hpp"
+#include "FunctionType.hpp"
+#include "Group.hpp"
+#include "Interface.hpp"
+#include "ListType.hpp"
+#include "Logging.hpp"
+#include "ParseErrors.hpp"
+#include "StructMember.hpp"
+#include "StructType.hpp"
+#include "Symbol.hpp"
+#include "SymbolScope.hpp"
+#include "UnionCase.hpp"
+#include "UnionType.hpp"
 #include "annotations.h"
-#include "cpptempl.h"
+#include "cpptempl.hpp"
 
+#include <algorithm>
 #include <cstring>
 
 using namespace erpcgen;
@@ -65,7 +66,7 @@ string Symbol::printAnnotations()
     ret += "Annotations [ ";
     int16_t annotationCount = (int16_t)m_annotations.size();
     int16_t annotationIndex = 1;
-    for (auto annotation : m_annotations)
+    for (auto &annotation : m_annotations)
     {
         ret += annotation.toString();
         if (annotationIndex < annotationCount)
@@ -79,7 +80,7 @@ string Symbol::printAnnotations()
     return ret;
 }
 
-Annotation *Symbol::findAnnotation(string name, Annotation::program_lang_t lang)
+Annotation *Symbol::findAnnotation(const string &name, Annotation::program_lang_t lang)
 {
     vector<Annotation *> annotationList = getAnnotations(name, lang);
     if (0 < annotationList.size())
@@ -92,13 +93,13 @@ Annotation *Symbol::findAnnotation(string name, Annotation::program_lang_t lang)
     }
 }
 
-vector<Annotation *> Symbol::getAnnotations(string name, Annotation::program_lang_t lang)
+vector<Annotation *> Symbol::getAnnotations(const string &name, Annotation::program_lang_t lang)
 {
     vector<Annotation *> anList;
     for (unsigned int i = 0; i < m_annotations.size(); ++i)
     {
         if (m_annotations[i].getName() == name &&
-            (m_annotations[i].getLang() == lang || m_annotations[i].getLang() == Annotation::kAll))
+            (m_annotations[i].getLang() == lang || m_annotations[i].getLang() == Annotation::program_lang_t::kAll))
         {
             anList.push_back(&m_annotations[i]);
         }
@@ -106,22 +107,20 @@ vector<Annotation *> Symbol::getAnnotations(string name, Annotation::program_lan
     return anList;
 }
 
-Value *Symbol::getAnnValue(const string annName, Annotation::program_lang_t lang)
+Value *Symbol::getAnnValue(const string &annName, Annotation::program_lang_t lang)
 {
     Annotation *ann = findAnnotation(annName, lang);
     return (ann) ? ann->getValueObject() : nullptr;
 }
 
-string Symbol::getAnnStringValue(const string annName, Annotation::program_lang_t lang)
+string Symbol::getAnnStringValue(const string &annName, Annotation::program_lang_t lang)
 {
     Value *annVallue = getAnnValue(annName, lang);
     return (annVallue) ? annVallue->toString() : "";
 }
 
-SymbolScope::typed_iterator::typed_iterator(const vit &bv, const vit &ev, Symbol::symbol_type_t predicateType)
-: m_vec(bv)
-, m_endvec(ev)
-, m_predicateType(predicateType)
+SymbolScope::typed_iterator::typed_iterator(const vit &bv, const vit &ev, Symbol::symbol_type_t predicateType) :
+m_vec(bv), m_endvec(ev), m_predicateType(predicateType)
 {
     // Advance to the first matching symbol.
     while (m_vec != m_endvec && (*m_vec)->getSymbolType() != m_predicateType)
@@ -198,7 +197,7 @@ void SymbolScope::addSymbol(Symbol *sym, int32_t pos)
     if (hasSymbol(sym->getName()) && sym->getName() != "")
     {
         Symbol *existing = getSymbol(sym->getName());
-        if (existing->isBuiltin())
+        if (existing->isDatatypeSymbol() && dynamic_cast<DataType *>(existing)->isBuiltin())
         {
             throw semantic_error(format_string("line %d: attempted redefinition of builtin symbol '%s'",
                                                sym->getFirstLine(), sym->getName().c_str()));
@@ -238,7 +237,7 @@ void SymbolScope::replaceSymbol(Symbol *oldSym, Symbol *newSym)
     }
 }
 
-int32_t SymbolScope::getSymbolPos(Symbol *sym)
+int32_t SymbolScope::getSymbolPos(const Symbol *sym)
 {
     for (unsigned int i = 0; i < m_symbolVector.size(); i++)
     {
@@ -343,7 +342,7 @@ string StructMember::getDescription() const
     return format_string("<member %s:%s>", m_name.c_str(), (m_dataType ? m_dataType->getName().c_str() : "(no type)"));
 }
 
-EnumMember *EnumType::getMember(string name)
+EnumMember *EnumType::getMember(const string &name)
 {
     for (auto member : m_members)
     {
@@ -397,13 +396,13 @@ void Group::addInterface(Interface *iface)
     m_interfaces.push_back(iface);
 }
 
-void Group::addDirToSymbolsMap(Symbol *symbol, _param_direction dir)
+void Group::addDirToSymbolsMap(Symbol *symbol, param_direction_t dir)
 {
     Log::info("Adding direction %d for symbol \"%s\"\n", dir, symbol->getName().c_str());
     auto it = m_symbolDirections.find(symbol);
     if (it == m_symbolDirections.end())
     {
-        set<_param_direction> directions;
+        set<param_direction_t> directions;
         directions.insert(dir);
         m_symbolDirections[symbol] = directions;
 
@@ -423,9 +422,9 @@ void Group::setTemplate(cpptempl::data_map groupTemplate)
     m_template = groupTemplate;
 }
 
-const set<_param_direction> Group::getSymbolDirections(Symbol *symbol) const
+const set<param_direction_t> Group::getSymbolDirections(Symbol *symbol) const
 {
-    set<_param_direction> directions;
+    set<param_direction_t> directions;
     auto it = m_symbolDirections.find(symbol);
     if (it != m_symbolDirections.end())
     {
@@ -476,12 +475,14 @@ DataType *DataType::getTrueContainerDataType()
     DataType *trueDataType = this->getTrueDataType();
     switch (trueDataType->getDataType())
     {
-        case DataType::kListType: {
+        case DataType::data_type_t::kListType:
+        {
             ListType *l = dynamic_cast<ListType *>(trueDataType);
             assert(l);
             return l->getElementType()->getTrueContainerDataType();
         }
-        case DataType::kArrayType: {
+        case DataType::data_type_t::kArrayType:
+        {
             ArrayType *a = dynamic_cast<ArrayType *>(trueDataType);
             assert(a);
             return a->getElementType()->getTrueContainerDataType();
@@ -511,6 +512,14 @@ void Interface::addFunction(Function *func)
 
     m_scope.addSymbol(func);
     m_functions.push_back(func);
+}
+
+void Interface::addFunctionType(FunctionType *func)
+{
+    assert(func);
+
+    m_scope.addSymbol(func);
+    m_functionTypes.push_back(func);
 }
 
 string Interface::getDescription() const

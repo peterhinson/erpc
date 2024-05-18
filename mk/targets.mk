@@ -122,8 +122,8 @@ $(MAKE_TARGET): $(OBJECTS_ALL)
 	@$(call printmessage,link,Linking, $(APP_NAME))
 	$(at)$(LD) $(LDFLAGS) \
 		$(OBJECTS_ALL) \
-		$(LIBRARIES) \
-		-o $@
+		-o $@ \
+		$(LIBRARIES)
 	@echo "Output binary:" ; echo "  $(APP_NAME)"
 
 endif
@@ -134,7 +134,7 @@ endif
 .PHONY: clean
 clean::
 	@echo "Cleaning $(APP_NAME)"
-	$(at)rm -rf $(OBJECTS_ALL) $(OBJECTS_DIRS) $(MAKE_TARGET)
+	$(at)$(rmc) $(OBJECTS_ALL) $(OBJECTS_DIRS) $(MAKE_TARGET)
 
 # Include dependency files.
 -include $(OBJECTS_ALL:.o=.d)

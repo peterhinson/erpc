@@ -40,6 +40,9 @@
 //! Specify the symbol name.
 #define NAME_ANNOTATION "name"
 
+//! Specify the namespace of program code.
+#define NAMESPACE_ANNOTATION "namespace"
+
 //! Turn off error checking code for allocations in generated output
 #define NO_ALLOC_ERRORS_ANNOTATION "no_alloc_errors"
 
@@ -64,6 +67,9 @@
 //! Do not free memory for a parameter in the server shim.
 #define RETAIN_ANNOTATION "retain"
 
+//! Scope name for erpc shim code
+#define SCOPE_NAME_ANNOTATION "scope_name"
+
 //! Data handled through shared memory area
 #define SHARED_ANNOTATION "shared"
 
@@ -72,8 +78,5 @@
 
 //! Shared memory area end address
 #define SHARED_MEMORY_END_ANNOTATION "shared_memory_end"
-
-//! Place all types definitions (e.g. typedef, structs, etc.) into one file
-#define TYPES_HEADER_ANNOTATION "types_header"
 
 #endif /* _EMBEDDED_RPC__ANNOTATIONS_H_ */

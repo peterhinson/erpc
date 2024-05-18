@@ -8,12 +8,15 @@
 
 #include "erpc_server_setup.h"
 
-#include "test_server.h"
-#include "test_unit_test_common_server.h"
+#include "c_test_server.h"
+#include "test_server.hpp"
 #include "unit_test.h"
 #include "unit_test_wrapped.h"
 
 #include <stdlib.h>
+
+using namespace erpc;
+using namespace erpcShim;
 
 Binary_service *svc;
 
@@ -70,6 +73,21 @@ void test_binary_allDirectionLength(const uint8_t *a, const binary_t *b, binary_
     free((void *)a);
     free((void *)b);
 }*/
+class Binary_server : public Binary_interface
+{
+public:
+    void sendBinary(const binary_t *a) { ::sendBinary(a); }
+
+    void test_binary_allDirection(const binary_t *a, const binary_t *b, binary_t *e)
+    {
+        ::test_binary_allDirection(a, b, e);
+    }
+
+    void test_binary_allDirectionLength(const uint8_t *a, const binary_t *b, binary_t *d, uint32_t p1)
+    {
+        ::test_binary_allDirectionLength(a, b, d, p1);
+    }
+};
 
 ////////////////////////////////////////////////////////////////////////////////
 // Add service to server code
@@ -80,7 +98,7 @@ void add_services(erpc::SimpleServer *server)
     /* Define services to add using dynamic memory allocation
      * Exapmle:ArithmeticService_service * svc = new ArithmeticService_service();
      */
-    svc = new Binary_service();
+    svc = new Binary_service(new Binary_server());
 
     /* Add services
      * Example: server->addService(svc);
@@ -100,6 +118,7 @@ void remove_services(erpc::SimpleServer *server)
     server->removeService(svc);
     /* Delete unused service
      */
+    delete svc->getHandler();
     delete svc;
 }
 
@@ -107,31 +126,18 @@ void remove_services(erpc::SimpleServer *server)
 extern "C" {
 #endif
 erpc_service_t service_test = NULL;
-void add_services_to_server()
+void add_services_to_server(erpc_server_t server)
 {
     service_test = create_Binary_service();
-    erpc_add_service_to_server(service_test);
+    erpc_add_service_to_server(server, service_test);
 }
 
-void remove_services_from_server()
+void remove_services_from_server(erpc_server_t server)
 {
-    erpc_remove_service_from_server(service_test);
-#if ERPC_ALLOCATION_POLICY == ERPC_ALLOCATION_POLICY_DYNAMIC
+    erpc_remove_service_from_server(server, service_test);
     destroy_Binary_service(service_test);
-#elif ERPC_ALLOCATION_POLICY == ERPC_ALLOCATION_POLICY_STATIC
-    destroy_Binary_service();
-#endif
 }
 
-void remove_common_services_from_server(erpc_service_t service)
-{
-    erpc_remove_service_from_server(service);
-#if ERPC_ALLOCATION_POLICY == ERPC_ALLOCATION_POLICY_DYNAMIC
-    destroy_Common_service(service);
-#elif ERPC_ALLOCATION_POLICY == ERPC_ALLOCATION_POLICY_STATIC
-    destroy_Common_service();
-#endif
-}
 #ifdef __cplusplus
 }
 #endif

@@ -6,7 +6,7 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#include "erpc_usb_cdc_transport.h"
+#include "erpc_usb_cdc_transport.hpp"
 
 #include <cstdio>
 
@@ -29,7 +29,7 @@ static serial_read_handle_t s_serialReadHandle = &s_serialReadHandleBuffer[0]; /
 // Code
 ////////////////////////////////////////////////////////////////////////////////
 
-static void ERPC_SerialManagerTxCallback(void *callbackParam, serial_manager_callback_message_t *message,
+static void ERPC_SerialManagerTxCallback(const void *callbackParam, const serial_manager_callback_message_t *message,
                                          serial_manager_status_t status)
 {
     UsbCdcTransport *transport = s_usbcdc_instance;
@@ -46,7 +46,7 @@ static void ERPC_SerialManagerTxCallback(void *callbackParam, serial_manager_cal
     }
 }
 
-static void ERPC_SerialManagerRxCallback(void *callbackParam, serial_manager_callback_message_t *message,
+static void ERPC_SerialManagerRxCallback(const void *callbackParam, const serial_manager_callback_message_t *message,
                                          serial_manager_status_t status)
 {
     UsbCdcTransport *transport = s_usbcdc_instance;
@@ -83,15 +83,13 @@ void UsbCdcTransport::rx_cb(void)
 
 UsbCdcTransport::UsbCdcTransport(serial_handle_t serialHandle, serial_manager_config_t *serialConfig,
                                  serial_port_usb_cdc_config_t *usbCdcConfig, uint8_t *usbRingBuffer,
-                                 uint32_t usbRingBufferLength)
-: m_serialHandle(serialHandle)
-, m_serialConfig(serialConfig)
-, m_usbCdcConfig(usbCdcConfig)
-, m_usbRingBuffer(usbRingBuffer)
-, m_usbRingBufferLength(usbRingBufferLength)
+                                 uint32_t usbRingBufferLength) :
+m_serialHandle(serialHandle),
+m_serialConfig(serialConfig), m_usbCdcConfig(usbCdcConfig), m_usbRingBuffer(usbRingBuffer),
+m_usbRingBufferLength(usbRingBufferLength)
 #if !ERPC_THREADS_IS(NONE)
-, m_rxSemaphore()
-, m_txSemaphore()
+,
+m_rxSemaphore(), m_txSemaphore()
 #endif
 {
     s_usbcdc_instance = this;

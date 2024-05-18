@@ -6,12 +6,18 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
+#include "c_test_client.h"
 #include "gtest.h"
-#include "test.h"
+#include "unit_test_wrapped.h"
 
 ////////////////////////////////////////////////////////////////////////////////
 // Unit test Implementation code
 ////////////////////////////////////////////////////////////////////////////////
+
+void initInterfaces(erpc_client_t client)
+{
+    initEnumsService_client(client);
+}
 
 enumColor enumColorA = green;
 enumColor enumColorB = red;
@@ -21,21 +27,21 @@ TEST(test_enum, test_enumColor_in_out)
     enumColor c;
     test_enumColor_in(enumColorA);
     test_enumColor_out(&c);
-    EXPECT_TRUE(enumColorA == c);
+    EXPECT_EQ(enumColorA, c);
 }
 
 TEST(test_enum, test_enumColor_inout)
 {
     enumColor e = enumColorA;
     test_enumColor_inout(&e);
-    EXPECT_TRUE(enumColorB == e);
+    EXPECT_EQ(enumColorB, e);
 }
 
 TEST(test_enum, test_enumColor_return)
 {
     test_enumColor_in(enumColorB);
     enumColor r = test_enumColor_return();
-    EXPECT_TRUE(enumColorA == r);
+    EXPECT_EQ(enumColorA, r);
 }
 
 TEST(test_enum, test_enumColor_allDirection)
@@ -45,9 +51,9 @@ TEST(test_enum, test_enumColor_allDirection)
 
     enumColor r = test_enumColor_allDirection(enumColorA, enumColorB, &c, &e);
 
-    EXPECT_TRUE(enumColorA == c);
-    EXPECT_TRUE(enumColorB == e);
-    EXPECT_TRUE(enumColorA == r);
+    EXPECT_EQ(enumColorA, c);
+    EXPECT_EQ(enumColorB, e);
+    EXPECT_EQ(enumColorA, r);
 }
 
 TEST(test_enum, test_enumColor2_allDirection)
@@ -59,9 +65,9 @@ TEST(test_enum, test_enumColor2_allDirection)
 
     enumColor2 r = test_enumColor2_allDirection(a, b, &c, &e);
 
-    EXPECT_TRUE(a == c);
-    EXPECT_TRUE(b == e);
-    EXPECT_TRUE(a == r);
+    EXPECT_EQ(a, c);
+    EXPECT_EQ(b, e);
+    EXPECT_EQ(a, r);
 }
 
 TEST(test_enum, test_enumErrorCode_allDirection)
@@ -73,7 +79,7 @@ TEST(test_enum, test_enumErrorCode_allDirection)
 
     enumErrorCode r = test_enumErrorCode_allDirection(a, b, &c, &e);
 
-    EXPECT_TRUE(a == c);
-    EXPECT_TRUE(b == e);
-    EXPECT_TRUE(a == r);
+    EXPECT_EQ(a, c);
+    EXPECT_EQ(b, e);
+    EXPECT_EQ(a, r);
 }

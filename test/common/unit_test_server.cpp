@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2014-2016, Freescale Semiconductor, Inc.
- * Copyright 2016 - 2020 NXP
+ * Copyright 2016 - 2023 NXP
  * All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
@@ -8,39 +8,47 @@
 
 #include "erpc_mbf_setup.h"
 #include "erpc_server_setup.h"
-#include "erpc_simple_server.h"
+#include "erpc_simple_server.hpp"
 #include "erpc_transport_setup.h"
 
 #if (defined(RPMSG) || defined(UART) || defined(MU))
 extern "C" {
+#if defined(UART)
+/* clang-format off */
+#include "fsl_lpuart_cmsis.h"
+
+#include "app_core0.h"
+/* clang-format on */
+#else
 #if defined(RPMSG)
-#define APP_ERPC_READY_EVENT_DATA (1)
-#include "mcmgr.h"
 #include "rpmsg_lite.h"
-#elif defined(UART)
-#include "fsl_usart_cmsis.h"
-#elif defined(MU)
-#define APP_ERPC_READY_EVENT_DATA (1)
-#include "mcmgr.h"
 #endif
+#define APP_ERPC_READY_EVENT_DATA (1)
+/* clang-format off */
+#include "mcmgr.h"
+
 #include "app_core1.h"
+/* clang-format on */
+#endif
 #if defined(__CC_ARM) || defined(__ARMCC_VERSION)
-int main(int argc, const char *argv[]);
+int main(void);
 #endif
 }
 #endif
 
 #include "board.h"
-#include "myAlloc.h"
-#include "test_unit_test_common_server.h"
+
+#include "c_test_unit_test_common_server.h"
+#include "myAlloc.hpp"
 #include "unit_test_wrapped.h"
 
 ////////////////////////////////////////////////////////////////////////////////
 // Variables
 ////////////////////////////////////////////////////////////////////////////////
 
-int MyAlloc::allocated_ = 0;
+int ::MyAlloc::allocated_ = 0;
 erpc_service_t service_common = NULL;
+erpc_server_t server;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Code
@@ -51,20 +59,9 @@ static void SignalReady(void)
     /* Signal the other core we are ready by trigerring the event and passing the APP_ERPC_READY_EVENT_DATA */
     MCMGR_TriggerEvent(kMCMGR_RemoteApplicationEvent, APP_ERPC_READY_EVENT_DATA);
 }
-/*!
- * @brief Application-specific implementation of the SystemInitHook() weak function.
- */
-void SystemInitHook(void)
-{
-    /* Initialize MCMGR - low level multicore management library. Call this
-       function as close to the reset entry as possible to allow CoreUp event
-       triggering. The SystemInitHook() weak function overloading is used in this
-       application. */
-    MCMGR_EarlyInit();
-}
 #endif
 
-int main(int argc, const char *argv[])
+int main(void)
 {
     BOARD_InitHardware();
 
@@ -83,6 +80,7 @@ int main(int argc, const char *argv[])
 
     erpc_transport_t transport;
     erpc_mbf_t message_buffer_factory;
+
 #if defined(RPMSG)
     transport = erpc_transport_rpmsg_lite_remote_init(101, 100, (void *)startupData, ERPC_TRANSPORT_RPMSG_LITE_LINK_ID,
                                                       SignalReady, NULL);
@@ -96,22 +94,22 @@ int main(int argc, const char *argv[])
 #endif
 
     /* Init server */
-    erpc_server_init(transport, message_buffer_factory);
+    server = erpc_server_init(transport, message_buffer_factory);
 
     /* Add test services. This function call erpc_add_service_to_server for all necessary services. */
-    add_services_to_server();
+    add_services_to_server(server);
 
     /* Add common service */
-    add_common_service();
+    add_common_service(server);
 
 #if defined(MU)
     SignalReady();
 #endif
     /* Add run server */
-    erpc_server_run();
+    erpc_server_run(server);
 
     /* Deinit server */
-    erpc_server_deinit();
+    erpc_server_deinit(server);
 
     return 0;
 }
@@ -120,10 +118,16 @@ int main(int argc, const char *argv[])
 // Server helper functions
 ////////////////////////////////////////////////////////////////////////////////
 
-void add_common_service()
+void add_common_service(erpc_server_t server)
 {
     service_common = create_Common_service();
-    erpc_add_service_to_server(service_common);
+    erpc_add_service_to_server(server, service_common);
+}
+
+void remove_common_services_from_server(erpc_server_t server, erpc_service_t service)
+{
+    erpc_remove_service_from_server(server, service);
+    destroy_Common_service(service);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -133,17 +137,17 @@ void add_common_service()
 void quit()
 {
     /* removing common services from the server */
-    remove_common_services_from_server(service_common);
+    remove_common_services_from_server(server, service_common);
 
     /* removing individual test services from the server */
-    remove_services_from_server();
+    remove_services_from_server(server);
 
-    erpc_server_stop();
+    erpc_server_stop(server);
 }
 
 int32_t getServerAllocated()
 {
-    int result = MyAlloc::allocated();
-    MyAlloc::allocated(0);
+    int result = ::MyAlloc::allocated();
+    ::MyAlloc::allocated(0);
     return result;
 }

@@ -7,12 +7,12 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#include "UniqueIdChecker.h"
+#include "UniqueIdChecker.hpp"
 
-#include "Annotation.h"
-#include "Logging.h"
-#include "ParseErrors.h"
-#include "Symbol.h"
+#include "Annotation.hpp"
+#include "Logging.hpp"
+#include "ParseErrors.hpp"
+#include "Symbol.hpp"
 #include "annotations.h"
 
 #include <algorithm>
@@ -26,23 +26,23 @@ using namespace std;
 // Code
 ////////////////////////////////////////////////////////////////////////////////
 
-void UniqueIdChecker::makeIdsUnique(erpcgen::InterfaceDefinition &def)
+void UniqueIdChecker::makeIdsUnique(InterfaceDefinition &def)
 {
-    initUsedInterfaceIds(def.getGlobals().getSymbolsOfType(Symbol::kInterfaceSymbol));
+    initUsedInterfaceIds(def.getGlobals().getSymbolsOfType(Symbol::symbol_type_t::kInterfaceSymbol));
 
-    for (auto it : def.getGlobals().getSymbolsOfType(Symbol::kInterfaceSymbol))
+    for (auto it : def.getGlobals().getSymbolsOfType(Symbol::symbol_type_t::kInterfaceSymbol))
     {
         assert(nullptr != it);
         Interface *interface = dynamic_cast<Interface *>(it);
         assert(interface);
-        if (Annotation *interfaceId = interface->findAnnotation(ID_ANNOTATION, Annotation::kAll))
+        if (Annotation *interfaceId = interface->findAnnotation(ID_ANNOTATION, Annotation::program_lang_t::kAll))
         {
             setInterfaceId(interface, interfaceId);
         }
         initUsedFunctionIds(interface);
         for (auto function : interface->getFunctions())
         {
-            if (Annotation *functionId = function->findAnnotation(ID_ANNOTATION, Annotation::kAll))
+            if (Annotation *functionId = function->findAnnotation(ID_ANNOTATION, Annotation::program_lang_t::kAll))
             {
                 setFunctionId(function, functionId);
             }

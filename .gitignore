@@ -105,3 +105,10 @@ tags
 
 format-files-to-commit.rb
 language\.settings\.xml
+*.vsix
+null.d
+boost.7z
+boost*/
+mingw.7z
+mingw64/
+vs_BuildTools*

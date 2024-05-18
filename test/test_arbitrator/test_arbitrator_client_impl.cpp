@@ -6,22 +6,32 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#include "erpc_simple_server.h"
+#include "erpc_simple_server.hpp"
 
+#include "c_test_firstInterface_client.h"
+#include "c_test_secondInterface_server.h"
 #include "gtest.h"
-#include "test_firstInterface.h"
-#include "test_secondInterface_server.h"
+#include "test_secondInterface_server.hpp"
+#include "unit_test.h"
+#include "unit_test_wrapped.h"
 
 ////////////////////////////////////////////////////////////////////////////////
 // Unit test Implementation code
 ////////////////////////////////////////////////////////////////////////////////
 
+using namespace erpc;
+
 #define number 15
 #define nestedCallsCount 10
-int i = 0;
-int numbers[number];
+volatile int j = 0;
+volatile int numbers[number];
 volatile bool enabled = false;
 SecondInterface_service *svc;
+
+void initInterfaces(erpc_client_t client)
+{
+    initFirstInterface_client(client);
+}
 
 TEST(test_arbitrator, FirstSendReceiveInt)
 {
@@ -32,7 +42,7 @@ TEST(test_arbitrator, FirstSendReceiveInt)
     for (int i = number - 1; i >= 0; i--)
     {
         int b = firstReceiveInt();
-        EXPECT_TRUE(i == b);
+        EXPECT_EQ(i, b);
     }
 }
 
@@ -45,7 +55,7 @@ TEST(test_arbitrator, FirstSendReceiveInt2)
     for (int i = number - 1; i >= 0; i--)
     {
         int b = firstReceiveInt();
-        EXPECT_TRUE(i == b);
+        EXPECT_EQ(i, b);
     }
 }
 
@@ -55,24 +65,29 @@ TEST(test_arbitrator, NestedCallTest)
     while (!enabled)
     {
     };
-    EXPECT_TRUE(nestedCallTest() == nestedCallsCount * 2 - 1);
+    EXPECT_EQ(nestedCallTest(), nestedCallsCount * 2 - 1);
 }
 
 TEST(test_arbitrator, GetResultFromSecondSide)
 {
-    EXPECT_TRUE(getResultFromSecondSide() == 0);
+    EXPECT_EQ(getResultFromSecondSide(), 0);
+}
+
+TEST(test_arbitrator, testCasesAreDone)
+{
+    testCasesAreDone();
 }
 
 void secondSendInt(int32_t a)
 {
-    numbers[i] = a;
-    i++;
+    numbers[j] = a;
+    j++;
 }
 
 int32_t secondReceiveInt()
 {
-    i--;
-    return numbers[i];
+    j--;
+    return numbers[j];
 }
 
 int32_t callFirstSide()
@@ -94,12 +109,38 @@ void enableFirstSide()
     enabled = true;
 }
 
+class SecondInterface_server : public SecondInterface_interface
+{
+public:
+    void secondSendInt(int32_t a) { ::secondSendInt(a); }
+
+    int32_t secondReceiveInt(void)
+    {
+        int32_t result;
+        result = ::secondReceiveInt();
+
+        return result;
+    }
+
+    void quitSecondInterfaceServer(void) { ::quitSecondInterfaceServer(); }
+
+    void enableFirstSide(void) { ::enableFirstSide(); }
+
+    int32_t callFirstSide(void)
+    {
+        int32_t result;
+        result = ::callFirstSide();
+
+        return result;
+    }
+};
+
 void add_services(erpc::SimpleServer *server)
 {
     /* Define services to add using dynamic memory allocation
      * Exapmle:ArithmeticService_service * svc = new ArithmeticService_service();
      */
-    svc = new SecondInterface_service();
+    svc = new SecondInterface_service(new SecondInterface_server());
 
     /* Add services
      * Example: server->addService(svc);
@@ -119,5 +160,6 @@ void remove_services(erpc::SimpleServer *server)
     server->removeService(svc);
     /* Delete unused service
      */
+    delete svc->getHandler();
     delete svc;
 }

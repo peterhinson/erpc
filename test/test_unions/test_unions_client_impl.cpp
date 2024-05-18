@@ -6,8 +6,9 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
+#include "c_test_client.h"
 #include "gtest.h"
-#include "test.h"
+#include "unit_test_wrapped.h"
 
 #include <string.h>
 
@@ -17,6 +18,11 @@ using namespace std;
 // Unit test Implementation code
 ////////////////////////////////////////////////////////////////////////////////
 
+void initInterfaces(erpc_client_t client)
+{
+    initArithmeticService_client(client);
+}
+
 TEST(test_unions, testGenericCallback)
 {
     gapGenericEvent_t event = {
@@ -24,7 +30,7 @@ TEST(test_unions, testGenericCallback)
         { gBleSuccess_c, gHciCommandStatus_c, 5 },
     };
     gapGenericEvent_t *newEvent = testGenericCallback(&event);
-    EXPECT_TRUE(newEvent->eventType == gWhiteListSizeReady_c);
+    EXPECT_EQ(newEvent->eventType, gWhiteListSizeReady_c);
     erpc_free(newEvent);
 
     event.eventType = gRandomAddressReady_c;
@@ -34,16 +40,16 @@ TEST(test_unions, testGenericCallback)
         event.eventData.aAddress[i] = x ^ 0xFF;
     }
     newEvent = testGenericCallback(&event);
-    EXPECT_TRUE(newEvent->eventType == gTestCaseReturn_c);
-    EXPECT_TRUE(newEvent->eventData.returnCode == 1);
+    EXPECT_EQ(newEvent->eventType, gTestCaseReturn_c);
+    EXPECT_EQ(newEvent->eventData.returnCode, 1);
     erpc_free(newEvent);
 
     event.eventType = gWhiteListSizeReady_c;
     event.eventData.whiteListSize = 100;
     newEvent = testGenericCallback(&event);
-    EXPECT_TRUE(newEvent->eventType == gTestCaseReturn_c);
+    EXPECT_EQ(newEvent->eventType, gTestCaseReturn_c);
     // printf("Vaue of return code: %d\n", newEvent->eventData.returnCode);
-    EXPECT_TRUE(newEvent->eventData.returnCode == 100);
+    EXPECT_EQ(newEvent->eventData.returnCode, 100);
     erpc_free(newEvent);
 }
 
@@ -58,8 +64,8 @@ TEST(test_unions, testUnionLists)
         myFoo.bing.a.elements[i] = i + 1;
     }
     foo *returnFoo = sendMyFoo(&myFoo);
-    EXPECT_TRUE(returnFoo->discriminator == returnVal);
-    EXPECT_TRUE(returnFoo->bing.ret == 0xAA);
+    EXPECT_EQ(returnFoo->discriminator, returnVal);
+    EXPECT_EQ(returnFoo->bing.ret, 0xAA);
     erpc_free((void *)myFoo.bing.a.elements);
     erpc_free((void *)returnFoo);
 
@@ -68,9 +74,9 @@ TEST(test_unions, testUnionLists)
     myFoo.bing.y = 4.0;
     returnFoo = sendMyFoo(&myFoo);
 
-    EXPECT_TRUE(returnFoo->discriminator == papaya);
-    EXPECT_TRUE(returnFoo->bing.x == 4);
-    EXPECT_TRUE(returnFoo->bing.y == 3);
+    EXPECT_EQ(returnFoo->discriminator, papaya);
+    EXPECT_EQ(returnFoo->bing.x, 4);
+    EXPECT_EQ(returnFoo->bing.y, 3);
 
     erpc_free((void *)returnFoo);
 }
@@ -89,8 +95,8 @@ TEST(test_unions, testNestedStructs)
     }
 
     foo *returnFoo = sendMyFoo(&myFoo);
-    EXPECT_TRUE(returnFoo->discriminator == returnVal);
-    EXPECT_TRUE(returnFoo->bing.ret == 0xAA);
+    EXPECT_EQ(returnFoo->discriminator, returnVal);
+    EXPECT_EQ(returnFoo->bing.ret, 0xAA);
     erpc_free((void *)myFoo.bing.myFoobar.rawString.data);
     erpc_free((void *)returnFoo);
 }
@@ -107,8 +113,8 @@ TEST(test_unions, testUnionAnn)
         myFoo.a.elements[i] = i + 1;
     }
     foo *returnFoo = sendMyUnion(discriminator, &myFoo);
-    EXPECT_TRUE(returnFoo->discriminator == returnVal);
-    EXPECT_TRUE(returnFoo->bing.ret == 0xAA);
+    EXPECT_EQ(returnFoo->discriminator, returnVal);
+    EXPECT_EQ(returnFoo->bing.ret, 0xAA);
     erpc_free((void *)myFoo.a.elements);
     erpc_free((void *)returnFoo);
 
@@ -117,9 +123,9 @@ TEST(test_unions, testUnionAnn)
     myFoo.y = 4.0;
     returnFoo = sendMyUnion(discriminator, &myFoo);
 
-    EXPECT_TRUE(returnFoo->discriminator == papaya);
-    EXPECT_TRUE(returnFoo->bing.x == 4);
-    EXPECT_TRUE(returnFoo->bing.y == 3);
+    EXPECT_EQ(returnFoo->discriminator, papaya);
+    EXPECT_EQ(returnFoo->bing.x, 4);
+    EXPECT_EQ(returnFoo->bing.y, 3);
 
     erpc_free((void *)returnFoo);
 }

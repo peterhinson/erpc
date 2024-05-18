@@ -9,14 +9,18 @@
  */
 
 #include "erpc_config_internal.h"
-#include "erpc_manually_constructed.h"
+#include "erpc_manually_constructed.hpp"
 #include "erpc_mbf_setup.h"
-#include "erpc_message_buffer.h"
-#include "erpc_rpmsg_lite_base_transport.h"
+#include "erpc_message_buffer.hpp"
+#include "erpc_rpmsg_lite_base.hpp"
 
+extern "C" {
 #include "rpmsg_lite.h"
+}
 
 using namespace erpc;
+
+#define TIMEOUT_MS 10
 
 ////////////////////////////////////////////////////////////////////////////////
 // Classes
@@ -33,7 +37,7 @@ public:
      *
      * @param [in] rpmsg Pointer to instance of RPMSG lite.
      */
-    RPMsgMessageBufferFactory(struct rpmsg_lite_instance *rpmsg) { m_rpmsg = rpmsg; }
+    explicit RPMsgMessageBufferFactory(struct rpmsg_lite_instance *rpmsg) { m_rpmsg = rpmsg; }
 
     /*!
      * @brief Destructor
@@ -49,10 +53,10 @@ public:
     {
         void *buf = NULL;
         uint32_t size = 0;
-        buf = rpmsg_lite_alloc_tx_buffer(m_rpmsg, &size, RL_BLOCK);
+        buf = rpmsg_lite_alloc_tx_buffer(m_rpmsg, &size, TIMEOUT_MS);
 
         erpc_assert(NULL != buf);
-        return MessageBuffer((uint8_t *)buf, size);
+        return MessageBuffer(reinterpret_cast<uint8_t *>(buf), size);
     }
 
     /*!
@@ -63,7 +67,7 @@ public:
     virtual void dispose(MessageBuffer *buf)
     {
         erpc_assert(buf != NULL);
-        void *tmp = (void *)buf->get();
+        void *tmp = reinterpret_cast<void *>(buf->get());
         if (tmp != NULL)
         {
             int32_t ret;
@@ -75,14 +79,15 @@ public:
         }
     }
 
-    virtual erpc_status_t prepareServerBufferForSend(MessageBuffer *message)
+    virtual erpc_status_t prepareServerBufferForSend(MessageBuffer &message, uint8_t reserveHeaderSize = 0)
     {
         erpc_status_t status;
 
-        dispose(message);
-        *message = create();
-        if (message->get() != NULL)
+        dispose(&message);
+        message = create();
+        if (message.get() != NULL)
         {
+            message.setUsed(reserveHeaderSize);
             status = kErpcStatus_Success;
         }
         else
@@ -103,10 +108,41 @@ protected:
 // Variables
 ////////////////////////////////////////////////////////////////////////////////
 
-ERPC_MANUALLY_CONSTRUCTED(RPMsgMessageBufferFactory, s_msgFactory);
+ERPC_MANUALLY_CONSTRUCTED_STATIC(RPMsgMessageBufferFactory, s_msgFactory);
 
 erpc_mbf_t erpc_mbf_rpmsg_init(erpc_transport_t transport)
 {
-    s_msgFactory.construct(reinterpret_cast<RPMsgBaseTransport *>(transport)->get_rpmsg_lite_instance());
-    return reinterpret_cast<erpc_mbf_t>(s_msgFactory.get());
+    RPMsgMessageBufferFactory *msgFactory;
+
+#if ERPC_ALLOCATION_POLICY == ERPC_ALLOCATION_POLICY_STATIC
+    if (s_msgFactory.isUsed())
+    {
+        msgFactory = NULL;
+    }
+    else
+    {
+        s_msgFactory.construct(reinterpret_cast<RPMsgBase *>(transport)->get_rpmsg_lite_instance());
+        msgFactory = s_msgFactory.get();
+    }
+#elif ERPC_ALLOCATION_POLICY == ERPC_ALLOCATION_POLICY_DYNAMIC
+    msgFactory = new RPMsgMessageBufferFactory(reinterpret_cast<RPMsgBase *>(transport)->get_rpmsg_lite_instance());
+#else
+#error "Unknown eRPC allocation policy!"
+#endif
+
+    return reinterpret_cast<erpc_mbf_t>(msgFactory);
+}
+
+void erpc_mbf_rpmsg_deinit(erpc_mbf_t mbf)
+{
+#if ERPC_ALLOCATION_POLICY == ERPC_ALLOCATION_POLICY_STATIC
+    (void)mbf;
+    s_msgFactory.destroy();
+#elif ERPC_ALLOCATION_POLICY == ERPC_ALLOCATION_POLICY_DYNAMIC
+    erpc_assert(mbf != NULL);
+
+    RPMsgMessageBufferFactory *msgFactory = reinterpret_cast<RPMsgMessageBufferFactory *>(mbf);
+
+    delete msgFactory;
+#endif
 }

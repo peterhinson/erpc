@@ -6,8 +6,9 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
+#include "c_test_client.h"
 #include "gtest.h"
-#include "test.h"
+#include "unit_test_wrapped.h"
 
 #include <string.h>
 
@@ -16,6 +17,11 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////
 // Unit test Implementation code
 ////////////////////////////////////////////////////////////////////////////////
+
+void initInterfaces(erpc_client_t client)
+{
+    initPointersService_client(client);
+}
 
 TEST(test_list, SendReceivedInt32)
 {
@@ -35,7 +41,7 @@ TEST(test_list, SendReceivedInt32)
     int32_t *list_r = received_list->elements;
     for (uint32_t i = 0; i < received_list->elementsCount; ++i)
     {
-        EXPECT_TRUE(*list_r / 2 == *list_s);
+        EXPECT_EQ(*list_r / 2, *list_s);
         ++list_s;
         ++list_r;
     }
@@ -52,7 +58,7 @@ TEST(test_list, sendReceiveZeroSize)
 
     received_list = sendReceivedInt32(&send_list);
 
-    EXPECT_TRUE(received_list->elementsCount == 0);
+    EXPECT_EQ(received_list->elementsCount, 0);
 
     erpc_free(received_list->elements);
     erpc_free(received_list);
@@ -88,7 +94,7 @@ TEST(test_list, SendReceived2Int32)
         list_r = list_int32_1_t_r->elements;
         for (uint32_t j = 0; j < list_int32_1_t_r->elementsCount; ++j)
         {
-            EXPECT_TRUE((*list_r) / 2 == *list_s);
+            EXPECT_EQ((*list_r) / 2, *list_s);
             ++list_s;
             ++list_r;
         }
@@ -122,7 +128,7 @@ TEST(test_list, SendReceived2Int32)
 //     int32_t *list_r = received_list;
 //     for (uint32_t i = 0; i < listSize; ++i)
 //     {
-//         EXPECT_TRUE(*list_r / 2 == *list_s);
+//         EXPECT_EQ(*list_r / 2 , *list_s);
 //         ++list_s;
 //         ++list_r;
 //     }
@@ -150,7 +156,7 @@ TEST(test_list, SendReceived2Int32)
 //     int32_t *list_r = received_list;
 //     for (uint32_t i = 0; i < listSize; ++i)
 //     {
-//         EXPECT_TRUE(*list_r / 2 == *list_s);
+//         EXPECT_EQ(*list_r / 2 , *list_s);
 //         ++list_s;
 //         ++list_r;
 //     }
@@ -173,7 +179,7 @@ TEST(test_list, SendReceivedEnum)
     enumColor *list_r = received_list->elements;
     for (uint32_t i = 0; i < received_list->elementsCount; ++i)
     {
-        EXPECT_TRUE(*list_r == *list_s);
+        EXPECT_EQ(*list_r, *list_s);
         ++list_s;
         ++list_r;
     }
@@ -224,7 +230,7 @@ TEST(test_list, SendReceived2Enum)
         list_r = list_enumColor_1_t_r->elements;
         for (uint32_t j = 0; j < list_enumColor_1_t_r->elementsCount; ++j)
         {
-            EXPECT_TRUE(*list_r == *list_s);
+            EXPECT_EQ(*list_r, *list_s);
             ++list_s;
             ++list_r;
         }
@@ -257,8 +263,8 @@ TEST(test_list, SendReceivedStruct)
     C *list_r = received_list->elements;
     for (uint32_t i = 0; i < received_list->elementsCount; ++i)
     {
-        EXPECT_TRUE((list_r->m) / 2 == list_s->m);
-        EXPECT_TRUE((list_r->n) / 2 == list_s->n);
+        EXPECT_EQ((list_r->m) / 2, list_s->m);
+        EXPECT_EQ((list_r->n) / 2, list_s->n);
         ++list_s;
         ++list_r;
     }
@@ -298,8 +304,8 @@ TEST(test_list, SendReceived2Struct)
         list_r = list_int32_1_t_r->elements;
         for (uint32_t j = 0; j < list_int32_1_t_r->elementsCount; ++j)
         {
-            EXPECT_TRUE(list_r->m / 2 == list_s->m);
-            EXPECT_TRUE(list_r->n / 2 == list_s->n);
+            EXPECT_EQ(list_r->m / 2, list_s->m);
+            EXPECT_EQ(list_r->n / 2, list_s->n);
             ++list_s;
             ++list_r;
         }
@@ -431,9 +437,9 @@ TEST(test_list, test_list_allDirection)
     e_list_e = expect_list_e->elements;
     for (uint32_t i = 0; i < send_list_a->elementsCount; ++i)
     {
-        EXPECT_TRUE(*s_list_a == *e_list_a);
-        EXPECT_TRUE(*s_list_b == *e_list_b);
-        EXPECT_TRUE(*s_list_e == *e_list_e);
+        EXPECT_EQ(*s_list_a, *e_list_a);
+        EXPECT_EQ(*s_list_b, *e_list_b);
+        EXPECT_EQ(*s_list_e, *e_list_e);
         ++s_list_a;
         ++s_list_b;
         ++s_list_e;
@@ -466,7 +472,7 @@ TEST(test_list, testLengthAnnotation)
         ++list_ptr;
     }
     int32_t result = testLengthAnnotation(list, length);
-    EXPECT_TRUE(result == 1);
+    EXPECT_EQ(result, 1);
     erpc_free(list);
 }
 
@@ -480,7 +486,7 @@ TEST(test_list, testLengthAnnotationInStruct)
         myListStruct.myList[i] = (int32_t)i + 1;
     }
     int32_t result = testLengthAnnotationInStruct(&myListStruct);
-    EXPECT_TRUE(result == 10);
+    EXPECT_EQ(result, 10);
     erpc_free(myListStruct.myList);
 }
 
@@ -494,10 +500,10 @@ TEST(test_list, returnSentStructLengthAnnotation)
         myListStruct.myList[i] = (int32_t)i + 1;
     }
     listStruct *returnStruct = returnSentStructLengthAnnotation(&myListStruct);
-    EXPECT_TRUE(myListStruct.len == returnStruct->len);
+    EXPECT_EQ(myListStruct.len, returnStruct->len);
     for (unsigned int i = 0; i < returnStruct->len; ++i)
     {
-        EXPECT_TRUE(myListStruct.myList[i] == returnStruct->myList[i]);
+        EXPECT_EQ(myListStruct.myList[i], returnStruct->myList[i]);
     }
     erpc_free(myListStruct.myList);
     erpc_free(returnStruct->myList);
@@ -532,7 +538,7 @@ TEST(test_list, sendGapAdvertisingData)
 
     int32_t result = sendGapAdvertisingData(&ad);
 
-    EXPECT_TRUE(33 == result);
+    EXPECT_EQ(33, result);
 
     erpc_free(ad1.aData);
     erpc_free(ad2.aData);

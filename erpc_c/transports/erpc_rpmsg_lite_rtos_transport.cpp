@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2015, Freescale Semiconductor, Inc.
- * Copyright 2016-2022 NXP
+ * Copyright 2016-2023 NXP
  * Copyright 2021 ACRIOS Systems s.r.o.
  * All rights reserved.
  *
@@ -8,30 +8,29 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#include "erpc_rpmsg_lite_rtos_transport.h"
+#include "erpc_rpmsg_lite_rtos_transport.hpp"
+
 #include "erpc_config_internal.h"
 
+extern "C" {
 #include "rpmsg_ns.h"
+}
 
 using namespace erpc;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Variables
 ////////////////////////////////////////////////////////////////////////////////
-uint8_t RPMsgBaseTransport::s_initialized = 0U;
-struct rpmsg_lite_instance *RPMsgBaseTransport::s_rpmsg;
+uint8_t RPMsgBase::s_initialized = 0U;
+struct rpmsg_lite_instance *RPMsgBase::s_rpmsg;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Code
 ////////////////////////////////////////////////////////////////////////////////
 
-RPMsgRTOSTransport::RPMsgRTOSTransport(void)
-: RPMsgBaseTransport()
-, m_rdev(NULL)
-, m_app_rp_chnl(NULL)
-, m_dst_addr(0)
-, m_rpmsg_queue(NULL)
-, m_rpmsg_ept(NULL)
+RPMsgRTOSTransport::RPMsgRTOSTransport(void) :
+Transport(), RPMsgBase(), m_rdev(NULL), m_app_rp_chnl(NULL), m_dst_addr(0), m_rpmsg_queue(NULL), m_rpmsg_ept(NULL),
+m_crcImpl(NULL)
 {
 }
 
@@ -164,7 +163,7 @@ erpc_status_t RPMsgRTOSTransport::init(uint32_t src_addr, uint32_t dst_addr, voi
                 ready_cb();
             }
 
-            rpmsg_lite_wait_for_link_up(s_rpmsg);
+            (void)rpmsg_lite_wait_for_link_up(s_rpmsg, RL_BLOCK);
 
 #if RL_USE_STATIC_API
             m_rpmsg_queue = rpmsg_queue_create(s_rpmsg, m_queue_stack, &m_queue_context);
@@ -245,7 +244,7 @@ erpc_status_t RPMsgRTOSTransport::receive(MessageBuffer *message)
 
     ret_val = rpmsg_queue_recv_nocopy(s_rpmsg, m_rpmsg_queue, &m_dst_addr, &buf, &length, RL_BLOCK);
     erpc_assert(buf != NULL);
-    message->set((uint8_t *)buf, length);
+    message->set(reinterpret_cast<uint8_t *>(buf), length);
     message->setUsed(length);
 
     return (ret_val != RL_SUCCESS) ? kErpcStatus_ReceiveFailed : kErpcStatus_Success;
@@ -273,4 +272,20 @@ erpc_status_t RPMsgRTOSTransport::send(MessageBuffer *message)
     }
 
     return status;
+}
+
+bool RPMsgRTOSTransport::hasMessage(void)
+{
+    return ((rpmsg_queue_get_current_size(m_rpmsg_queue) > 0) ? true : false);
+}
+
+void RPMsgRTOSTransport::setCrc16(Crc16 *crcImpl)
+{
+    erpc_assert(crcImpl != NULL);
+    m_crcImpl = crcImpl;
+}
+
+Crc16 *RPMsgRTOSTransport::getCrc16(void)
+{
+    return m_crcImpl;
 }

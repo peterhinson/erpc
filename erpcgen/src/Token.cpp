@@ -7,10 +7,10 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#include "Token.h"
+#include "Token.hpp"
 
-#include "ErpcLexer.h"
-#include "ParseErrors.h"
+#include "ErpcLexer.hpp"
+#include "ParseErrors.hpp"
 
 using namespace erpcgen;
 using namespace std;
@@ -19,10 +19,7 @@ using namespace std;
 // Code
 ////////////////////////////////////////////////////////////////////////////////
 
-Token::Token(const Token &other)
-: m_token(other.m_token)
-, m_value()
-, m_location(other.m_location)
+Token::Token(const Token &other) : m_token(other.m_token), m_value(), m_location(other.m_location)
 {
     if (other.m_value)
     {

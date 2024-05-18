@@ -8,8 +8,8 @@
 
 #include "erpc_server_setup.h"
 
-#include "test_server.h"
-#include "test_unit_test_common_server.h"
+#include "c_test_server.h"
+#include "c_test_unit_test_common_server.h"
 #include "unit_test.h"
 #include "unit_test_wrapped.h"
 
@@ -51,18 +51,8 @@ void remove_services(erpc::SimpleServer *server)
 #ifdef __cplusplus
 extern "C" {
 #endif
-void add_services_to_server() {}
-void remove_services_from_server() {}
-
-void remove_common_services_from_server(erpc_service_t service)
-{
-    erpc_remove_service_from_server(service);
-#if ERPC_ALLOCATION_POLICY == ERPC_ALLOCATION_POLICY_DYNAMIC
-    destroy_Common_service(service);
-#elif ERPC_ALLOCATION_POLICY == ERPC_ALLOCATION_POLICY_STATIC
-    destroy_Common_service();
-#endif
-}
+void add_services_to_server(erpc_server_t server) {}
+void remove_services_from_server(erpc_server_t server) {}
 #ifdef __cplusplus
 }
 #endif

@@ -8,9 +8,8 @@
 
 @crc
 @output_dir("erpc_outputs/")
+@namespace("")
 program test;
-
-import "../common/unit_test_common.erpc"
 
 @group("firstInterface")
 interface FirstInterface
@@ -20,6 +19,7 @@ interface FirstInterface
     firstReceiveInt() -> int32
     stopSecondSide() -> void
     getResultFromSecondSide() -> int32
+    oneway testCasesAreDone()
     oneway quitFirstInterfaceServer()
     nestedCallTest() -> int32
     @nested

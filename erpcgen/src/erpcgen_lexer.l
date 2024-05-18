@@ -23,13 +23,13 @@
  ******************************************************************************/
 
 %{
-#include "ErpcLexer.h"
+#include "ErpcLexer.hpp"
 #include <stdlib.h>
 #include <stdio.h>
 #include <limits.h>
 #include <string>
-#include "HexValues.h"
-#include "Value.h"
+#include "HexValues.hpp"
+#include "Value.hpp"
 
 using namespace erpcgen;
 
@@ -237,6 +237,8 @@ void            { return TOK_VOID; }
 
 "->"                                { return TOK_ARROW; }
 
+"::"                                { return TOK_IFACE_SCOPE; }
+
 [@{}()\[\]<>=,;:+\-*/%^~&|]         { return yytext[0]; }
 
 \"(ESC|[^\"])*\"                    {
@@ -280,8 +282,9 @@ void            { return TOK_VOID; }
 
 <*>.                                {
                                         /* all other chars produce errors */
-                                        char msg[50];
-                                        sprintf(msg, "unexpected character '%c' on line %d", yytext[0], yylineno);
+                                        const uint8_t msgLen = 50;
+                                        char msg[msgLen];
+                                        (void)snprintf(msg, msgLen, "unexpected character '%c' on line %d", yytext[0], yylineno);
                                         LexerError(msg);
                                     }
 

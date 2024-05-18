@@ -24,11 +24,6 @@ bool nestingDetection = false;
 #endif
 #endif
 
-void ClientManager::setTransport(Transport *transport)
-{
-    m_transport = transport;
-}
-
 RequestContext ClientManager::createRequest(bool isOneway)
 {
     // Create codec to read and write the request.
@@ -83,7 +78,7 @@ void ClientManager::performClientRequest(RequestContext &request)
     // Send invocation request to server.
     if (request.getCodec()->isStatusOk() == true)
     {
-        err = m_transport->send(request.getCodec()->getBuffer());
+        err = m_transport->send(&request.getCodec()->getBufferRef());
         request.getCodec()->updateStatus(err);
     }
 
@@ -93,7 +88,7 @@ void ClientManager::performClientRequest(RequestContext &request)
         if (request.getCodec()->isStatusOk() == true)
         {
             // Receive reply.
-            err = m_transport->receive(request.getCodec()->getBuffer());
+            err = m_transport->receive(&request.getCodec()->getBufferRef());
             request.getCodec()->updateStatus(err);
         }
 
@@ -131,7 +126,7 @@ void ClientManager::performNestedClientRequest(RequestContext &request)
     // Send invocation request to server.
     if (request.getCodec()->isStatusOk() == true)
     {
-        err = m_transport->send(request.getCodec()->getBuffer());
+        err = m_transport->send(&request.getCodec()->getBufferRef());
         request.getCodec()->updateStatus(err);
     }
 
@@ -172,15 +167,15 @@ void ClientManager::verifyReply(RequestContext &request)
 
     // Some transport layers change the request's message buffer pointer (for things like zero
     // copy support), so inCodec must be reset to work with correct buffer.
-    request.getCodec()->reset();
+    request.getCodec()->reset(m_transport->reserveHeaderSize());
 
     // Extract the reply header.
-    request.getCodec()->startReadMessage(&msgType, &service, &requestNumber, &sequence);
+    request.getCodec()->startReadMessage(msgType, service, requestNumber, sequence);
 
     if (request.getCodec()->isStatusOk() == true)
     {
         // Verify that this is a reply to the request we just sent.
-        if ((msgType != kReplyMessage) || (sequence != request.getSequence()))
+        if ((msgType != message_type_t::kReplyMessage) || (sequence != request.getSequence()))
         {
             request.getCodec()->updateStatus(kErpcStatus_ExpectedReply);
         }
@@ -191,13 +186,14 @@ Codec *ClientManager::createBufferAndCodec(void)
 {
     Codec *codec = m_codecFactory->create();
     MessageBuffer message;
+    uint8_t reservedMessageSpace = m_transport->reserveHeaderSize();
 
     if (codec != NULL)
     {
-        message = m_messageFactory->create();
+        message = m_messageFactory->create(reservedMessageSpace);
         if (NULL != message.get())
         {
-            codec->setBuffer(message);
+            codec->setBuffer(message, reservedMessageSpace);
         }
         else
         {
@@ -214,7 +210,7 @@ void ClientManager::releaseRequest(RequestContext &request)
 {
     if (request.getCodec() != NULL)
     {
-        m_messageFactory->dispose(request.getCodec()->getBuffer());
+        m_messageFactory->dispose(&request.getCodec()->getBufferRef());
         m_codecFactory->dispose(request.getCodec());
     }
 }

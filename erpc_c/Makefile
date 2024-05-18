@@ -60,10 +60,10 @@ SOURCES += 	$(ERPC_C_ROOT)/infra/erpc_arbitrated_client_manager.cpp \
 			$(ERPC_C_ROOT)/infra/erpc_server.cpp \
 			$(ERPC_C_ROOT)/infra/erpc_simple_server.cpp \
 			$(ERPC_C_ROOT)/infra/erpc_transport_arbitrator.cpp \
+			$(ERPC_C_ROOT)/infra/erpc_utils.cpp \
 			$(ERPC_C_ROOT)/infra/erpc_pre_post_action.cpp \
 			$(ERPC_C_ROOT)/port/erpc_port_stdlib.cpp \
 			$(ERPC_C_ROOT)/port/erpc_threading_pthreads.cpp \
-			$(ERPC_C_ROOT)/port/erpc_serial.cpp \
 			$(ERPC_C_ROOT)/setup/erpc_arbitrated_client_setup.cpp \
 			$(ERPC_C_ROOT)/setup/erpc_client_setup.cpp \
 			$(ERPC_C_ROOT)/setup/erpc_setup_mbf_dynamic.cpp \
@@ -72,26 +72,30 @@ SOURCES += 	$(ERPC_C_ROOT)/infra/erpc_arbitrated_client_manager.cpp \
 			$(ERPC_C_ROOT)/setup/erpc_setup_serial.cpp \
 			$(ERPC_C_ROOT)/setup/erpc_setup_tcp.cpp \
 			$(ERPC_C_ROOT)/transports/erpc_inter_thread_buffer_transport.cpp \
-			$(ERPC_C_ROOT)/transports/erpc_serial_transport.cpp \
 			$(ERPC_C_ROOT)/transports/erpc_tcp_transport.cpp
+ifeq "$(is_mingw)" ""
+	SOURCES += $(ERPC_C_ROOT)/transports/erpc_serial_transport.cpp \
+				$(ERPC_C_ROOT)/port/erpc_serial.cpp
+endif
 
 HEADERS += 	$(ERPC_C_ROOT)/config/erpc_config.h \
-			$(ERPC_C_ROOT)/infra/erpc_arbitrated_client_manager.h \
-			$(ERPC_C_ROOT)/infra/erpc_basic_codec.h \
+			$(ERPC_C_ROOT)/infra/erpc_arbitrated_client_manager.hpp \
+			$(ERPC_C_ROOT)/infra/erpc_basic_codec.hpp \
 			$(ERPC_C_ROOT)/infra/erpc_client_manager.h \
-			$(ERPC_C_ROOT)/infra/erpc_codec.h \
-			$(ERPC_C_ROOT)/infra/erpc_crc16.h \
+			$(ERPC_C_ROOT)/infra/erpc_codec.hpp \
+			$(ERPC_C_ROOT)/infra/erpc_crc16.hpp \
 			$(ERPC_C_ROOT)/infra/erpc_common.h \
 			$(ERPC_C_ROOT)/infra/erpc_version.h \
-			$(ERPC_C_ROOT)/infra/erpc_framed_transport.h \
-			$(ERPC_C_ROOT)/infra/erpc_manually_constructed.h \
-			$(ERPC_C_ROOT)/infra/erpc_message_buffer.h \
-			$(ERPC_C_ROOT)/infra/erpc_message_loggers.h \
-			$(ERPC_C_ROOT)/infra/erpc_server.h \
-			$(ERPC_C_ROOT)/infra/erpc_static_queue.h \
-			$(ERPC_C_ROOT)/infra/erpc_transport_arbitrator.h \
-			$(ERPC_C_ROOT)/infra/erpc_transport.h \
-			$(ERPC_C_ROOT)/infra/erpc_client_server_common.h \
+			$(ERPC_C_ROOT)/infra/erpc_framed_transport.hpp \
+			$(ERPC_C_ROOT)/infra/erpc_manually_constructed.hpp \
+			$(ERPC_C_ROOT)/infra/erpc_message_buffer.hpp \
+			$(ERPC_C_ROOT)/infra/erpc_message_loggers.hpp \
+			$(ERPC_C_ROOT)/infra/erpc_server.hpp \
+			$(ERPC_C_ROOT)/infra/erpc_static_queue.hpp \
+			$(ERPC_C_ROOT)/infra/erpc_transport_arbitrator.hpp \
+			$(ERPC_C_ROOT)/infra/erpc_transport.hpp \
+			$(ERPC_C_ROOT)/infra/erpc_utils.hpp \
+			$(ERPC_C_ROOT)/infra/erpc_client_server_common.hpp \
 			$(ERPC_C_ROOT)/infra/erpc_pre_post_action.h \
 			$(ERPC_C_ROOT)/port/erpc_setup_extensions.h \
 			$(ERPC_C_ROOT)/port/erpc_config_internal.h \
@@ -103,17 +107,25 @@ HEADERS += 	$(ERPC_C_ROOT)/config/erpc_config.h \
 			$(ERPC_C_ROOT)/setup/erpc_mbf_setup.h \
 			$(ERPC_C_ROOT)/setup/erpc_server_setup.h \
 			$(ERPC_C_ROOT)/setup/erpc_transport_setup.h \
-			$(ERPC_C_ROOT)/transports/erpc_inter_thread_buffer_transport.h \
-			$(ERPC_C_ROOT)/transports/erpc_serial_transport.h \
-			$(ERPC_C_ROOT)/transports/erpc_tcp_transport.h
+			$(ERPC_C_ROOT)/transports/erpc_inter_thread_buffer_transport.hpp \
+			$(ERPC_C_ROOT)/transports/erpc_serial_transport.hpp \
+			$(ERPC_C_ROOT)/transports/erpc_tcp_transport.hpp
 
 MAKE_TARGET = $(TARGET_LIB)($(OBJECTS_ALL))
 
 include $(ERPC_ROOT)/mk/targets.mk
 
+# Release should be alwas static. Customers don't need install things.
+ifeq "$(build)" "release"
+    # Except Darwin.
+    ifeq "$(is_darwin)" ""
+        LIBRARIES += -static
+    endif
+endif
+
 $(TARGET_LIB)(%): %
 	@$(call printmessage,ar,Archiving, $(?F) in $(@F))
-	$(at)mkdir -p $(dir $(@))
+	$(at)$(mkdirc) -p $(dir $(@))
 	$(AR) $(ARFLAGS) $@ $?
 
 .PHONY: install
@@ -122,17 +134,17 @@ install: install_headers install_lib
 .PHONY: install_headers
 install_headers: $(HEADERS) |  $(INC_INSTALL_DIR)
 	@$(call printmessage,c,Installing, headers in $(INC_INSTALL_DIR))
-	$(at)mkdir -p $(INC_INSTALL_DIR)
+	$(at)$(mkdirc) -p $(INC_INSTALL_DIR)
 	$(at)install $(?) $(INC_INSTALL_DIR)
 
 $(INC_INSTALL_DIR):
-	$(at)mkdir -p $(INC_INSTALL_DIR)
+	$(at)$(mkdirc) -p $(INC_INSTALL_DIR)
 
 .PHONY: install_lib
 install_lib: $(TARGET_LIB)
 	@$(call printmessage,c,Installing, $(subst $(LIBS_ROOT)/,,$<) in $(LIB_INSTALL_DIR))
-	$(at)mkdir -p $(LIB_INSTALL_DIR)
+	$(at)$(mkdirc) -p $(LIB_INSTALL_DIR)
 	$(at)install $(TARGET_LIB) $(LIB_INSTALL_DIR)
 
 clean::
-	$(at)rm -rf $(OBJS_ROOT)/*.cpp $(OBJS_ROOT)/*.hpp $(OBJS_ROOT)/*.c
+	$(at)$(rmc) $(OBJS_ROOT)/*.cpp $(OBJS_ROOT)/*.hpp $(OBJS_ROOT)/*.c

@@ -1,24 +1,26 @@
 /*
  * Copyright (c) 2014-2015, Freescale Semiconductor, Inc.
- * Copyright 2016-2017 NXP
+ * Copyright 2016-2023 NXP
  * All rights reserved.
  *
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#include "Generator.h"
+#include "Generator.hpp"
 
 #include "erpc_version.h"
 
-#include "Logging.h"
-#include "ParseErrors.h"
+#include "Logging.hpp"
+#include "ParseErrors.hpp"
 #include "annotations.h"
-#include "format_string.h"
+#include "format_string.hpp"
 
-#include <boost/filesystem.hpp>
+#include <algorithm>
 #include <cstring>
 #include <ctime>
+#include <filesystem>
+#include <list>
 
 using namespace erpcgen;
 using namespace cpptempl;
@@ -28,12 +30,14 @@ using namespace std;
 // Code
 ////////////////////////////////////////////////////////////////////////////////
 
-Generator::Generator(InterfaceDefinition *def, generator_type_t generatorType)
-: m_idlCrc16(def->getIdlCrc16())
-, m_def(def)
-, m_globals(&(def->getGlobals()))
-, m_generatorType(generatorType)
+Generator::Generator(InterfaceDefinition *def, generator_type_t generatorType) :
+m_idlCrc16(def->getIdlCrc16()), m_def(def), m_globals(&(def->getGlobals())), m_generatorType(generatorType)
 {
+    string scopeName = "erpcShim";
+    string scopeNameC;
+    string scopeNamePrefix = "";
+    string namespaceVal = scopeName;
+
     m_templateData["erpcVersion"] = ERPC_VERSION;
     m_templateData["erpcVersionNumber"] = ERPC_VERSION_NUMBER;
 
@@ -75,15 +79,41 @@ Generator::Generator(InterfaceDefinition *def, generator_type_t generatorType)
             m_templateData["crc16"] = m_idlCrc16;
         }
 
-        m_outputDirectory /= getAnnStringValue(m_def->getProgramSymbol(), OUTPUT_DIR_ANNOTATION);
+        m_outputDirectory /= getAnnStringValue(program, OUTPUT_DIR_ANNOTATION);
+
+        if (findAnnotation(program, SCOPE_NAME_ANNOTATION) == nullptr)
+        {
+            scopeName = program->getName();
+        }
+        else
+        {
+            scopeName = getAnnStringValue(program, SCOPE_NAME_ANNOTATION);
+        }
+
+        if (findAnnotation(program, NAMESPACE_ANNOTATION) != nullptr)
+        {
+            namespaceVal = getAnnStringValue(program, NAMESPACE_ANNOTATION);
+        }
     }
+
+    m_templateData["scopeName"] = scopeName;
+    if (scopeName != "")
+    {
+        scopeNameC = scopeName;
+        std::transform(scopeNameC.begin(), scopeNameC.end(), scopeNameC.begin(), ::toupper);
+
+        scopeNamePrefix = "_";
+    }
+    m_templateData["scopeNameC"] = scopeNameC;
+    m_templateData["scopeNamePrefix"] = scopeNamePrefix;
+    m_templateData["namespace"] = namespaceVal;
 
     // get group annotation with vector of theirs interfaces
     m_groups.clear();
     data_list groupNames;
     Group *defaultGroup = new Group("");
 
-    for (auto it : m_globals->getSymbolsOfType(Symbol::kInterfaceSymbol))
+    for (auto it : m_globals->getSymbolsOfType(Symbol::symbol_type_t::kInterfaceSymbol))
     {
         Interface *iface = dynamic_cast<Interface *>(it);
         assert(iface);
@@ -131,20 +161,22 @@ Generator::Generator(InterfaceDefinition *def, generator_type_t generatorType)
     // set codec information
     switch (m_def->getCodecType())
     {
-        case InterfaceDefinition::kBasicCodec: {
+        case InterfaceDefinition::codec_t::kBasicCodec:
+        {
             m_templateData["codecClass"] = "BasicCodec";
-            m_templateData["codecHeader"] = "erpc_basic_codec.h";
+            m_templateData["codecHeader"] = "erpc_basic_codec.hpp";
             break;
         }
-        default: {
+        default:
+        {
             m_templateData["codecClass"] = "Codec";
-            m_templateData["codecHeader"] = "erpc_codec.h";
+            m_templateData["codecHeader"] = "erpc_codec.hpp";
             break;
         }
     }
 }
 
-Group *Generator::getGroupByName(string name)
+Group *Generator::getGroupByName(const string &name)
 {
     for (Group *group : m_groups)
     {
@@ -162,17 +194,10 @@ void Generator::openFile(ofstream &fileOutputStream, const string &fileName)
     if (!m_outputDirectory.empty())
     {
         // TODO: do we have to create a copy of the outputDir here? Doesn't make sense...
-        boost::filesystem::path dir(m_outputDirectory);
-        if (!boost::filesystem::is_directory(dir))
+        std::filesystem::create_directories(m_outputDirectory);
+        if (!std::filesystem::is_directory(m_outputDirectory))
         {
-            // Create_directories function return false also when it create new directory.
-            // It is in case, when directory ends with slash. For these case is better use is_directory for check if
-            // directories are created.
-            boost::filesystem::create_directories(dir);
-            if (!boost::filesystem::is_directory(dir))
-            {
-                throw runtime_error(format_string("could not create directory path '%s'", m_outputDirectory.c_str()));
-            }
+            throw runtime_error(format_string("could not create directory path '%s'", m_outputDirectory.c_str()));
         }
     }
     string filePathWithName = (m_outputDirectory / fileName).string();
@@ -293,7 +318,8 @@ DataType *Generator::findChildDataType(set<DataType *> &dataTypes, DataType *dat
 
     switch (dataType->getDataType())
     {
-        case DataType::kAliasType: {
+        case DataType::data_type_t::kAliasType:
+        {
             AliasType *aliasType = dynamic_cast<AliasType *>(dataType);
             if (aliasType != nullptr)
             {
@@ -301,7 +327,8 @@ DataType *Generator::findChildDataType(set<DataType *> &dataTypes, DataType *dat
             }
             break;
         }
-        case DataType::kArrayType: {
+        case DataType::data_type_t::kArrayType:
+        {
             ArrayType *arrayType = dynamic_cast<ArrayType *>(dataType);
             if (arrayType != nullptr)
             {
@@ -309,7 +336,8 @@ DataType *Generator::findChildDataType(set<DataType *> &dataTypes, DataType *dat
             }
             break;
         }
-        case DataType::kListType: {
+        case DataType::data_type_t::kListType:
+        {
             ListType *listType = dynamic_cast<ListType *>(dataType);
             if (listType != nullptr)
             {
@@ -317,7 +345,8 @@ DataType *Generator::findChildDataType(set<DataType *> &dataTypes, DataType *dat
             }
             break;
         }
-        case DataType::kStructType: {
+        case DataType::data_type_t::kStructType:
+        {
             StructType *structType = dynamic_cast<StructType *>(dataType);
             if (structType != nullptr)
             {
@@ -328,7 +357,8 @@ DataType *Generator::findChildDataType(set<DataType *> &dataTypes, DataType *dat
             }
             break;
         }
-        case DataType::kUnionType: {
+        case DataType::data_type_t::kUnionType:
+        {
             // Keil need extra pragma option when unions are used.
             m_templateData["usedUnionType"] = true;
             UnionType *unionType = dynamic_cast<UnionType *>(dataType);
@@ -341,7 +371,8 @@ DataType *Generator::findChildDataType(set<DataType *> &dataTypes, DataType *dat
             }
             break;
         }
-        default: {
+        default:
+        {
             break;
         }
     }
@@ -368,7 +399,7 @@ void Generator::findGroupDataTypes()
                 {
                     for (DataType *dataType : dataTypes)
                     {
-                        group->addDirToSymbolsMap(dataType, kReturn);
+                        group->addDirToSymbolsMap(dataType, param_direction_t::kReturn);
                     }
                 }
 
@@ -412,12 +443,21 @@ data_list Generator::makeGroupInterfacesTemplateData(Group *group)
 
         // TODO: for C only?
         ifaceInfo["serviceClassName"] = getOutputName(iface) + "_service";
+        ifaceInfo["clientClassName"] = getOutputName(iface) + "_client";
+        ifaceInfo["serverClassName"] = getOutputName(iface) + "_server";
+        ifaceInfo["interfaceClassName"] = getOutputName(iface) + "_interface";
 
         Log::info("%d: (%d) %s\n", n++, iface->getUniqueId(), iface->getName().c_str());
 
         /* Has interface function declared as non-external? */
         data_list functions = getFunctionsTemplateData(group, iface);
         ifaceInfo["functions"] = functions;
+        data_list callbacksInt;
+        data_list callbacksExt;
+        data_list callbacksAll;
+        getCallbacksTemplateData(group, iface, callbacksInt, callbacksExt, callbacksAll);
+        ifaceInfo["callbacksInt"] = callbacksInt;
+        ifaceInfo["callbacksAll"] = callbacksAll;
         ifaceInfo["isNonExternalInterface"] = false;
         for (unsigned int i = 0; i < functions.size(); ++i)
         {
@@ -437,26 +477,35 @@ data_list Generator::makeGroupInterfacesTemplateData(Group *group)
     return interfaces;
 }
 
-void Generator::generateGroupOutputFiles(Group *group)
+string Generator::getGroupCommonFileName(Group *group)
 {
-    // generate output files only for groups with interfaces or for IDLs with no interfaces at all
+    string fileName = "";
     if (!group->getInterfaces().empty() || (m_groups.size() == 1 && group->getName() == ""))
     {
         string groupName = group->getName();
-        string fileName = stripExtension(m_def->getOutputFilename());
+        fileName = stripExtension(m_def->getOutputFilename());
         m_templateData["outputFilename"] = fileName;
         if (groupName != "")
         {
             fileName += "_" + groupName;
         }
         Log::info("File name %s\n", fileName.c_str());
-        m_templateData["commonHeaderName"] = fileName;
+    }
+    return fileName;
+}
+
+void Generator::generateGroupOutputFiles(Group *group)
+{
+    // generate output files only for groups with interfaces or for IDLs with no interfaces at all
+    if (!group->getInterfaces().empty() || (m_groups.size() == 1 && group->getName() == ""))
+    {
+        string fileName = getGroupCommonFileName(group);
 
         // group templates
         m_templateData["group"] = group->getTemplate();
 
         // Log template data.
-        if (Log::getLogger()->getFilterLevel() >= Logger::kDebug2)
+        if (Log::getLogger()->getFilterLevel() >= Logger::log_level_t::kDebug2)
         {
             dump_data(m_templateData);
         }
@@ -549,10 +598,8 @@ string Generator::getOutputName(Symbol *symbol, bool check)
         auto it = reserverdWords.find(annName);
         if (it != reserverdWords.end())
         {
-            throw semantic_error(
-                format_string("line %d: Wrong symbol name '%s'. Cannot use program language reserved words.", line,
-                              annName.c_str())
-                    .c_str());
+            throw semantic_error(format_string(
+                "line %d: Wrong symbol name '%s'. Cannot use program language reserved words.", line, annName.c_str()));
         }
     }
 
@@ -561,34 +608,38 @@ string Generator::getOutputName(Symbol *symbol, bool check)
 
 Annotation::program_lang_t Generator::getAnnotationLang()
 {
-    if (m_generatorType == kC)
+    if (m_generatorType == generator_type_t::kC)
     {
-        return Annotation::kC;
+        return Annotation::program_lang_t::kC;
     }
-    else if (m_generatorType == kPython)
+    else if (m_generatorType == generator_type_t::kPython)
     {
-        return Annotation::kPython;
+        return Annotation::program_lang_t::kPython;
+    }
+    else if (m_generatorType == generator_type_t::kJava)
+    {
+        return Annotation::program_lang_t::kJava;
     }
 
     throw internal_error("Unsupported generator type specified for annotation.");
 }
 
-Annotation *Generator::findAnnotation(Symbol *symbol, string name)
+Annotation *Generator::findAnnotation(Symbol *symbol, const string &name)
 {
     return symbol->findAnnotation(name, getAnnotationLang());
 }
 
-vector<Annotation *> Generator::getAnnotations(Symbol *symbol, string name)
+vector<Annotation *> Generator::getAnnotations(Symbol *symbol, const string &name)
 {
     return symbol->getAnnotations(name, getAnnotationLang());
 }
 
-Value *Generator::getAnnValue(Symbol *symbol, string name)
+Value *Generator::getAnnValue(Symbol *symbol, const string &name)
 {
     return symbol->getAnnValue(name, getAnnotationLang());
 }
 
-string Generator::getAnnStringValue(Symbol *symbol, string name)
+string Generator::getAnnStringValue(Symbol *symbol, const string &name)
 {
     return symbol->getAnnStringValue(name, getAnnotationLang());
 }
@@ -606,4 +657,105 @@ data_list Generator::getFunctionsTemplateData(Group *group, Interface *iface)
         Log::info("    %d: (%d) %s\n", j, fit->getUniqueId(), function["prototype"]->getvalue().c_str());
     }
     return fns;
+}
+
+Generator::datatype_vector_t Generator::getDataTypesFromSymbolScope(SymbolScope *scope, DataType::data_type_t datatype)
+{
+    datatype_vector_t vector;
+
+    for (Symbol *symbol : scope->getSymbolsOfType(Symbol::symbol_type_t::kTypenameSymbol))
+    {
+        DataType *dataType = dynamic_cast<DataType *>(symbol);
+        if (dataType->getDataType() == datatype)
+        {
+            vector.push_back(dataType);
+        }
+    }
+
+    return vector;
+}
+
+void Generator::getCallbacksTemplateData(Group *group, const Interface *iface, data_list &callbackTypesInt,
+                                         data_list &callbackTypesExt, data_list &callbackTypesAll)
+{
+    list<FunctionType *> callbackTypes;
+    list<string> interfacesNames;
+    list<string> callbackTypesNames;
+    interfacesNames.push_back(iface->getName());
+    for (auto function : iface->getFunctions())
+    {
+        for (auto param : function->getParameters().getMembers())
+        {
+            DataType *datatype = param->getDataType()->getTrueDataType();
+            if (datatype->isFunction())
+            {
+                FunctionType *funType = dynamic_cast<FunctionType *>(datatype);
+                if (funType->getInterface() != iface)
+                {
+                    interfacesNames.push_back(funType->getInterface()->getName());
+                }
+                if ((std::find(callbackTypesNames.begin(), callbackTypesNames.end(), funType->getName()) ==
+                     callbackTypesNames.end()))
+                {
+                    callbackTypes.push_back(funType);
+                    callbackTypesNames.push_back(funType->getName());
+                }
+            }
+        }
+    }
+    for (auto functionType : iface->getFunctionTypes())
+    {
+        if ((std::find(callbackTypesNames.begin(), callbackTypesNames.end(), functionType->getName()) ==
+             callbackTypesNames.end()))
+        {
+            callbackTypes.push_back(functionType);
+            callbackTypesNames.push_back(functionType->getName());
+        }
+    }
+
+    for (auto functionType : callbackTypes)
+    {
+        data_list functionsInt;
+        data_list functionsExt;
+        data_list functionsAll;
+        for (auto fun : functionType->getCallbackFuns())
+        {
+            if ((std::find(interfacesNames.begin(), interfacesNames.end(), fun->getInterface()->getName()) !=
+                 interfacesNames.end()))
+            {
+                data_map function;
+                function["name"] = fun->getName();
+                if (fun->getInterface() == iface)
+                {
+                    functionsInt.push_back(function);
+                }
+                else
+                {
+                    functionsExt.push_back(function);
+                }
+                functionsAll.push_back(function);
+            }
+        }
+        if (!functionsAll.empty())
+        {
+            data_map callbackType;
+            callbackType["name"] = functionType->getName();
+            callbackType["typenameName"] = getFunctionPrototype(nullptr, functionType);
+            callbackType["interfaceTypenameName"] =
+                getFunctionPrototype(nullptr, functionType, iface->getName() + "_interface");
+            if (!functionsInt.empty())
+            {
+                callbackType["callbacks"] = functionsInt;
+                callbackType["callbacksData"] = getFunctionTypeTemplateData(group, functionType);
+                callbackTypesInt.push_back(callbackType);
+            }
+            if (!functionsExt.empty())
+            {
+                callbackType["callbacks"] = functionsExt;
+                callbackTypesExt.push_back(callbackType);
+            }
+            callbackType["callbacks"] = functionsAll;
+            callbackTypesAll.push_back(callbackType);
+        }
+    }
 }
